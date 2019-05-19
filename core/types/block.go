@@ -24,7 +24,7 @@ import (
 	"sort"
 	"sync/atomic"
 	"time"
-	"unsafe"
+        "reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -106,10 +106,12 @@ func (h *Header) Hash() common.Hash {
 	return rlpHash(h)
 }
 
+var headerSize = common.StorageSize(reflect.TypeOf(Header{}).Size())
+
 // Size returns the approximate memory used by all internal contents. It is used
 // to approximate and limit the memory consumption of various caches.
 func (h *Header) Size() common.StorageSize {
-	return common.StorageSize(unsafe.Sizeof(*h)) + common.StorageSize(len(h.Extra)+len(h.VerifiedNodeData)+len(h.FailedNodeData)+(h.Difficulty.BitLen()+h.Number.BitLen()+h.Time.BitLen())/8)
+        return headerSize + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen())/8)
 }
 
 func rlpHash(x interface{}) (h common.Hash) {
@@ -225,9 +227,6 @@ func NewBlockWithHeader(header *Header) *Block {
 // modifying a header variable.
 func CopyHeader(h *Header) *Header {
 	cpy := *h
-	if cpy.Time = new(uint64); h.Time != nil {
-		cpy.Time.Set(h.Time)
-	}
 	if cpy.Difficulty = new(big.Int); h.Difficulty != nil {
 		cpy.Difficulty.Set(h.Difficulty)
 	}
