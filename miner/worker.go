@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
@@ -153,9 +154,11 @@ type worker struct {
 	remoteUncles map[common.Hash]*types.Block // A set of side blocks as the possible uncle blocks.
 	unconfirmed  *unconfirmedBlocks           // A set of locally mined blocks pending canonicalness confirmations.
 
-	mu       sync.RWMutex // The lock used to protect the coinbase and extra fields
-	coinbase common.Address
-	extra    []byte
+	mu               sync.RWMutex // The lock used to protect the coinbase and extra fields
+	coinbase         common.Address
+	extra            []byte
+	verifiedNodeData []byte
+	failedNodeData   []byte
 
 	pendingMu    sync.RWMutex
 	pendingTasks map[common.Hash]*task
@@ -509,6 +512,33 @@ func (w *worker) taskLoop() {
 			if w.newTaskHook != nil {
 				w.newTaskHook(task)
 			}
+
+			// If node-protocol is active, miner takes responsibity for verifying node is active/available
+			if w.isRunning() && nodeprotocol.ActiveNode() != nil && w.current.header.Number.Int64() > params.PenaltySystemBlock {
+				for _, nodeType := range params.NodeTypes {
+
+					// Get total node count from contract
+					nodeCount := nodeprotocol.GetNodeCount(w.snapshotState, nodeType.ContractAddress)
+
+					parent := w.chain.GetBlock(w.current.header.ParentHash, w.current.header.Number.Uint64()-1)
+					nodeIndex := new(big.Int).Mod(parent.Hash().Big(), big.NewInt(nodeCount)).Int64()
+
+					// Get node state data using random number
+					nodeIdString, nodeAddressString := nodeprotocol.GetNodeData(w.snapshotState, nodeprotocol.GetNodeKey(w.snapshotState, nodeIndex, nodeType.ContractAddress), nodeType.ContractAddress)
+
+					_, err := nodeprotocol.ConfirmNodeActivity(nodeIdString)
+					if err != nil {
+						w.verifiedNodeData = nodeType.RemainderAddress.Bytes()
+						w.failedNodeData = []byte(nodeAddressString)
+						log.Info("Node Contact Error", "Error", err)
+						nodeIndex++
+					} else {
+						w.verifiedNodeData = []byte(nodeAddressString)
+						w.failedNodeData = []byte{}
+					}
+				}
+			}
+
 			// Reject duplicate sealing work due to resubmitting.
 			sealHash := w.engine.SealHash(task.block.Header())
 			if sealHash == prev {
@@ -835,11 +865,13 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 
 	num := parent.Number()
 	header := &types.Header{
-		ParentHash: parent.Hash(),
-		Number:     num.Add(num, common.Big1),
-		GasLimit:   core.CalcGasLimit(parent, w.gasFloor, w.gasCeil),
-		Extra:      w.extra,
-		Time:       uint64(timestamp),
+		ParentHash:       parent.Hash(),
+		Number:           num.Add(num, common.Big1),
+		GasLimit:         core.CalcGasLimit(parent, w.gasFloor, w.gasCeil),
+		Extra:            w.extra,
+		Time:             uint64(timestamp),
+		VerifiedNodeData: w.verifiedNodeData,
+		FailedNodeData:   w.failedNodeData,
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
 	if w.isRunning() {

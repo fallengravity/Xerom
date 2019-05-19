@@ -23,6 +23,38 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// Main node type configuration for node-protocol
+var NodeTypes = []NodeType{
+	NodeType{
+		Name:               "Chain Node",
+		RequiredCollateral: new(big.Int).Mul(big.NewInt(5000), big.NewInt(1e+18)),
+		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
+		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000001"),
+		ContractAddress:    common.HexToAddress("0x2583649fa09d6dafbdd845dbf05492ecf225627d"),
+	},
+	NodeType{
+		Name:               "Xero Node",
+		RequiredCollateral: new(big.Int).Mul(big.NewInt(20000), big.NewInt(1e+18)),
+		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
+		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000001"),
+		ContractAddress:    common.HexToAddress("0x2583649fa09d6dafbdd845dbf05492ecf225627d"),
+	},
+	NodeType{
+		Name:               "Link Node",
+		RequiredCollateral: new(big.Int).Mul(big.NewInt(40000), big.NewInt(1e+18)),
+		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
+		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000002"),
+		ContractAddress:    common.HexToAddress("0x2583649fa09d6dafbdd845dbf05492ecf225627d"),
+	},
+	NodeType{
+		Name:               "Super Node",
+		RequiredCollateral: new(big.Int).Mul(big.NewInt(80000), big.NewInt(1e+18)),
+		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
+		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000003"),
+		ContractAddress:    common.HexToAddress("0x2583649fa09d6dafbdd845dbf05492ecf225627d"),
+	},
+}
+
 // Genesis hashes to enforce below configs on.
 var (
 	MainnetGenesisHash = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
@@ -43,18 +75,18 @@ var TrustedCheckpoints = map[common.Hash]*TrustedCheckpoint{
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:        big.NewInt(1313118),
-		HomesteadBlock: big.NewInt(0),
-		DAOForkBlock:   nil,
-		DAOForkSupport: true,
-		EIP150Block:    big.NewInt(0),
-		EIP150Hash:     common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
-		EIP155Block:    big.NewInt(0),
-		EIP158Block:    big.NewInt(0),
-		ByzantiumBlock: big.NewInt(0),
-                ConstantinopleBlock: nil,
+		ChainID:             big.NewInt(1313118),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        nil,
+		DAOForkSupport:      true,
+		EIP150Block:         big.NewInt(0),
+		EIP150Hash:          common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: nil,
 		PetersburgBlock:     nil,
-		Ethash:         new(EthashConfig),
+		Ethash:              new(EthashConfig),
 	}
 
 	// MainnetTrustedCheckpoint contains the light client trusted checkpoint for the main network.
@@ -163,6 +195,16 @@ var (
 	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil}
 	TestRules       = TestChainConfig.Rules(new(big.Int))
 )
+
+// NodeType is the main node-protocol configuration for various
+// node types to be deployed on the network
+type NodeType struct {
+	Name               string
+	RequiredCollateral *big.Int
+	BlockReward        *big.Int
+	RemainderAddress   common.Address
+	ContractAddress    common.Address
+}
 
 // TrustedCheckpoint represents a set of post-processed trie roots (CHT and
 // BloomTrie) associated with the appropriate section index and head hash. It is
