@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // Check validity of previously recorded node address
@@ -36,11 +37,9 @@ func ValidateNodeAddress(state *state.StateDB, chain consensus.ChainReader, pare
 	        nodeAddressString := GetNodeKey(state, nodeIndex, contractAddress)
 
 	        if common.HexToAddress(nodeAddressString) == verifiedNode {
-		        //log.Info("Node Address Validation Successful", "Node Address", verifiedNode)
 		        return true
 	        }
         }
-	//log.Warn("Node Address Validation Failed", "Node Address", verifiedNode)
 	return false
 }
 
@@ -58,13 +57,16 @@ func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verified
         for i := int64(0); i < blockLookBack; i++ {
                 historicalBlock := chain.GetBlock(parentBlock.Header().ParentHash, parentBlock.Header().Number.Uint64()-1)
 
+                var checkNodes = verifiedNodes
                 var nodes = verifiedNodes
+
                 for index, nodeAddress := range nodes {
                         if strings.Contains(string(historicalBlock.Header().FailedNodeData), nodeAddress.String()) {
                                 disqualifiedNodes = append(disqualifiedNodes, nodeAddress)
-                                verifiedNodes[index] = verifiedNodes[len(verifiedNodes)-1] // Copy last element to index.
-                                verifiedNodes[len(verifiedNodes)-1] = common.HexToAddress("0x0")   // Erase last element (write zero value).
-                                verifiedNodes = verifiedNodes[:len(verifiedNodes)-1]
+                                checkNodes[index] = checkNodes[len(checkNodes)-1] // Copy last element to index.
+                                checkNodes[len(checkNodes)-1] = common.HexToAddress("0x0")   // Erase last element (write zero value).
+                                checkNodes = checkNodes[:len(checkNodes)-1]
+                                log.Info("Node Found as Inactive", "Status", "Disqualified")
                         }
                 }
 

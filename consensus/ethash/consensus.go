@@ -581,18 +581,23 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 		nodeAddresses := strings.Split(string(previousBlock.VerifiedNodeData()), "0x")
 
 		for i := 1; i < len(nodeAddresses); i++ {
+                       nodeAddress = append(nodeAddress, common.HexToAddress(nodeAddresses[i]))
+                }
 
-			contractAddress := params.NodeTypes[i-1].ContractAddress
-			if nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, common.HexToAddress(nodeAddresses[i]), contractAddress) {
-				log.Info("Node Address Validation Successful", "Address", nodeAddresses[i])
-				nodeAddress = append(nodeAddress, common.HexToAddress(nodeAddresses[i]))
+                disqualifiedNodes := nodeprotocol.CheckNodeHistory(chain, previousBlock, nodeAddress)
+
+		for i := 0; i < len(nodeAddress); i++ {
+
+			contractAddress := params.NodeTypes[i].ContractAddress
+			if nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, nodeAddress[i], contractAddress) && !contains(disqualifiedNodes, nodeAddress[i]) {
+				log.Info("Node Address Validation Successful", "Address", nodeAddress[i])
 			} else {
-				log.Warn("Node Address Validation Failed", "Address", nodeAddresses[i])
-				nodeAddress = append(nodeAddress, params.NodeTypes[i-1].RemainderAddress)
+				log.Warn("Node Address Validation Failed", "Address", nodeAddress[i])
+				nodeAddress[i] = params.NodeTypes[i].RemainderAddress
 			}
 
 			// Get reward remainder from previous bad reward validations
-			nodeRemainder = append(nodeRemainder, nodeprotocol.GetNodeRemainder(state, nodeprotocol.GetNodeCount(state, contractAddress), params.NodeTypes[i-1].RemainderAddress))
+			nodeRemainder = append(nodeRemainder, nodeprotocol.GetNodeRemainder(state, nodeprotocol.GetNodeCount(state, contractAddress), params.NodeTypes[i].RemainderAddress))
 		}
 	}
 
@@ -602,6 +607,15 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 
 	// Header seems complete, assemble into a block and return
 	return types.NewBlock(header, txs, uncles, receipts), nil
+}
+
+func contains(arr []common.Address, compare common.Address) bool {
+        for _, a := range arr {
+                if a == compare {
+                        return true
+                }
+        }
+        return false
 }
 
 // SealHash returns the hash of a block prior to it being sealed.
