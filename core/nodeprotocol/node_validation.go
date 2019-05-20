@@ -40,3 +40,32 @@ func ValidateNodeAddress(state *state.StateDB, chain consensus.ChainReader, pare
 	log.Warn("Node Address Validation Failed", "Node Address", verifiedNode)
 	return true
 }
+
+// Check historical node activity
+func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verifiedNodes []common.Address) []common.Address {
+        // Random number of blocks to check history - to deter bad actors
+        blockLookBack := new(big.Int).Mod(parent.Hash().Big(), big.NewInt(1000)).Int64()
+        if parent.Header().Number.Int64() < blockLookBack {
+                blockLookBack = parent.Header().Number.Int64()
+        }
+
+        // Loop through blocks to check for node inactivity
+        var disqualifiedNodes []common.Address
+        var parentBlock = parent
+        for i := 0; i < blockLookBack; i++ {
+                historicalBlock := chain.GetBlock(parentBlock.Header().ParentHash, parentBlock.Header().Number.Uint64()-1)
+
+                for nodeAddress, index := range verifiedNodes {
+                        if (strings.Contains(string(historicalBlock.Header().FailedNodeData), nodeAddress) {
+                                disqualifiedNodes = append(disqualifiedNodes, nodeAddress)
+                                verifiedNodes[index] = verifiedNodes[len(verifiedNodes)-1] // Copy last element to index.
+                                verifiedNodes[len(verifiedNodes)-1] = ""   // Erase last element (write zero value).
+                                verifiedNodes = verifiedNodes[:len(verifiedNodes)-1]
+                        }
+                }
+
+                // Set new parent block
+                parentBlock = historicalBlock
+        }
+        return disqualifiedNodes
+}
