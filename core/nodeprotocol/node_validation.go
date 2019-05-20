@@ -57,8 +57,10 @@ func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verified
         for i := int64(0); i < blockLookBack; i++ {
                 historicalBlock := chain.GetBlock(parentBlock.Header().ParentHash, parentBlock.Header().Number.Uint64()-1)
 
-                var checkNodes = verifiedNodes
-                var nodes = verifiedNodes
+                var checkNodes []common.Address
+                var nodes []common.Address
+                copy(checkNodes, verifiedNodes)
+                copy(nodes, verifiedNodes)
 
                 for index, nodeAddress := range nodes {
                         if strings.Contains(string(historicalBlock.Header().FailedNodeData), nodeAddress.String()) {

@@ -41,13 +41,13 @@ import (
 
 // Ethash proof-of-work protocol constants.
 var (
-	FrontierBlockReward  *big.Int = new(big.Int).Mul(big.NewInt(10), big.NewInt(1e+18)) // Block reward in wei for successfully mining a block
-	ByzantiumBlockReward *big.Int = new(big.Int).Mul(big.NewInt(10), big.NewInt(1e+18)) // Block reward in wei for successfully mining a block upward from Byzantium
+	FrontierBlockReward  *big.Int = new(big.Int).Mul(big.NewInt(50), big.NewInt(1e+18)) // Block reward in wei for successfully mining a block
+	ByzantiumBlockReward *big.Int = new(big.Int).Mul(big.NewInt(50), big.NewInt(1e+18)) // Block reward in wei for successfully mining a block upward from Byzantium
 	//Constantinople Disabled For Ether-1 Implementation
-	ConstantinopleBlockReward *big.Int = new(big.Int).Mul(big.NewInt(10), big.NewInt(1e+18)) // Block reward in wei for successfully mining a block upward from Constantinople
-	minerBlockReward          *big.Int = new(big.Int).Mul(big.NewInt(10), big.NewInt(1e+18))
-	masternodeBlockReward     *big.Int = big.NewInt(2e+18)
-	developmentBlockReward    *big.Int = big.NewInt(1e+18)
+	ConstantinopleBlockReward *big.Int = new(big.Int).Mul(big.NewInt(50), big.NewInt(1e+18)) // Block reward in wei for successfully mining a block upward from Constantinople
+	minerBlockReward          *big.Int = new(big.Int).Mul(big.NewInt(50), big.NewInt(1e+18))
+	masternodeBlockReward     *big.Int = new(big.Int).Mul(big.NewInt(20), big.NewInt(1e+18))
+	developmentBlockReward    *big.Int = new(big.Int).Mul(big.NewInt(20), big.NewInt(1e+18))
 	maxUncles                          = 2                // Maximum number of uncles allowed in a single block
 	allowedFutureBlockTime             = 15 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
 
@@ -590,9 +590,9 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 
 			contractAddress := params.NodeTypes[i].ContractAddress
 			if nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, nodeAddress[i], contractAddress) && !contains(disqualifiedNodes, nodeAddress[i]) {
-				log.Info("Node Address Validation Successful", "Address", nodeAddress[i])
+				log.Info("Node Address Validation Successful", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
 			} else {
-				log.Warn("Node Address Validation Failed", "Address", nodeAddress[i])
+				log.Warn("Node Address Validation Failed", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
 				nodeAddress[i] = params.NodeTypes[i].RemainderAddress
 			}
 
@@ -720,8 +720,9 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
                 if len(nodeAddress) == len(params.NodeTypes) {
 		        // Iterate over node types to disburse node rewards and calculated remainders
 		        for i := 0; i < len(params.NodeTypes); i++ {
+                                nodeReward := new(big.Int).Mul(masternodeReward, new(big.Int).Div(params.NodeTypes[i].RewardSplit, big.NewInt(100)))
 			        // Validated Node Address
-			        state.AddBalance(nodeAddress[i], masternodeReward) // Temp reward - permanent reward calculation still needed
+			        state.AddBalance(nodeAddress[i], nodeReward)
 			        // Node Fund Remainder
 			        state.AddBalance(nodeAddress[i], nodeRemainder[i])
 			        state.SubBalance(params.NodeTypes[i].RemainderAddress, nodeRemainder[i])

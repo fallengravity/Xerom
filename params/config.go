@@ -29,29 +29,33 @@ var NodeTypes = []NodeType{
 		Name:               "Chain Node",
 		RequiredCollateral: new(big.Int).Mul(big.NewInt(5000), big.NewInt(1e+18)),
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
+                RewardSplit:        big.NewInt(10), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000001"),
-		ContractAddress:    common.HexToAddress("0x2583649fa09d6dafbdd845dbf05492ecf225627d"),
+		ContractAddress:    common.HexToAddress("0xe44389c26fdeb581dea7df91efd0665a7cd404c1"),
 	},
 	NodeType{
 		Name:               "Xero Node",
 		RequiredCollateral: new(big.Int).Mul(big.NewInt(20000), big.NewInt(1e+18)),
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
+                RewardSplit:        big.NewInt(20), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000002"),
-		ContractAddress:    common.HexToAddress("0x2583649fa09d6dafbdd845dbf05492ecf225627d"),
+		ContractAddress:    common.HexToAddress("0xf2597dcb7e65371e8a13bd351042e19f9e53108e"),
 	},
 	NodeType{
 		Name:               "Link Node",
 		RequiredCollateral: new(big.Int).Mul(big.NewInt(40000), big.NewInt(1e+18)),
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
+                RewardSplit:        big.NewInt(30), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000003"),
-		ContractAddress:    common.HexToAddress("0x2583649fa09d6dafbdd845dbf05492ecf225627d"),
+		ContractAddress:    common.HexToAddress("0x126675a94cd6f36ccea425bd9296a7204318d8bd"),
 	},
 	NodeType{
 		Name:               "Super Node",
 		RequiredCollateral: new(big.Int).Mul(big.NewInt(80000), big.NewInt(1e+18)),
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
+                RewardSplit:        big.NewInt(40), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000004"),
-		ContractAddress:    common.HexToAddress("0x2583649fa09d6dafbdd845dbf05492ecf225627d"),
+		ContractAddress:    common.HexToAddress("0xa8436045cc995684344e7db41ca2f0391ca554e8"),
 	},
 }
 
@@ -202,6 +206,7 @@ type NodeType struct {
 	Name               string
 	RequiredCollateral *big.Int
 	BlockReward        *big.Int
+	RewardSplit        *big.Int
 	RemainderAddress   common.Address
 	ContractAddress    common.Address
 }
