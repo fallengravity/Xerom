@@ -18,6 +18,7 @@ package nodeprotocol
 
 import (
 	"math/big"
+        "strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -52,14 +53,15 @@ func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verified
         // Loop through blocks to check for node inactivity
         var disqualifiedNodes []common.Address
         var parentBlock = parent
-        for i := 0; i < blockLookBack; i++ {
+        for i := int64(0); i < blockLookBack; i++ {
                 historicalBlock := chain.GetBlock(parentBlock.Header().ParentHash, parentBlock.Header().Number.Uint64()-1)
 
-                for nodeAddress, index := range verifiedNodes {
-                        if (strings.Contains(string(historicalBlock.Header().FailedNodeData), nodeAddress) {
+                var nodes = verifiedNodes
+                for index, nodeAddress := range nodes {
+                        if strings.Contains(string(historicalBlock.Header().FailedNodeData), nodeAddress.String()) {
                                 disqualifiedNodes = append(disqualifiedNodes, nodeAddress)
                                 verifiedNodes[index] = verifiedNodes[len(verifiedNodes)-1] // Copy last element to index.
-                                verifiedNodes[len(verifiedNodes)-1] = ""   // Erase last element (write zero value).
+                                verifiedNodes[len(verifiedNodes)-1] = common.HexToAddress("0x0")   // Erase last element (write zero value).
                                 verifiedNodes = verifiedNodes[:len(verifiedNodes)-1]
                         }
                 }
