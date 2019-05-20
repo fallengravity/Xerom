@@ -517,25 +517,31 @@ func (w *worker) taskLoop() {
 			if w.isRunning() && nodeprotocol.ActiveNode() != nil && w.current.header.Number.Int64() > params.PenaltySystemBlock {
 				for _, nodeType := range params.NodeTypes {
 
+                                        w.verifiedNodeData = []byte{}
+                                        w.failedNodeData = []byte{}
+
 					// Get total node count from contract
 					nodeCount := nodeprotocol.GetNodeCount(w.snapshotState, nodeType.ContractAddress)
 
-					parent := w.chain.GetBlock(w.current.header.ParentHash, w.current.header.Number.Uint64()-1)
-					nodeIndex := new(big.Int).Mod(parent.Hash().Big(), big.NewInt(nodeCount)).Int64()
+					if nodeCount > 0 {
+                                                parent := w.chain.GetBlock(w.current.header.ParentHash, w.current.header.Number.Uint64()-1)
+					        nodeIndex := new(big.Int).Mod(parent.Hash().Big(), big.NewInt(nodeCount)).Int64()
 
-					// Get node state data using random number
-					nodeIdString, nodeAddressString := nodeprotocol.GetNodeData(w.snapshotState, nodeprotocol.GetNodeKey(w.snapshotState, nodeIndex, nodeType.ContractAddress), nodeType.ContractAddress)
+					        // Get node state data using random number
+					        nodeIdString, nodeAddressString := nodeprotocol.GetNodeData(w.snapshotState, nodeprotocol.GetNodeKey(w.snapshotState, nodeIndex, nodeType.ContractAddress), nodeType.ContractAddress)
 
-					_, err := nodeprotocol.ConfirmNodeActivity(nodeIdString)
-					if err != nil {
-						w.verifiedNodeData = nodeType.RemainderAddress.Bytes()
-						w.failedNodeData = []byte(nodeAddressString)
-						log.Info("Node Contact Error", "Error", err)
-						nodeIndex++
-					} else {
-						w.verifiedNodeData = []byte(nodeAddressString)
-						w.failedNodeData = []byte{}
-					}
+					        _, err := nodeprotocol.ConfirmNodeActivity(nodeIdString)
+					        if err != nil {
+						        w.verifiedNodeData = append(w.verifiedNodeData, nodeType.RemainderAddress.Bytes()...)
+						        w.failedNodeData = append(w.failedNodeData, []byte(nodeAddressString)...)
+						        log.Info("Node Contact Error", "Error", err)
+					        } else {
+						        w.verifiedNodeData = append(w.verifiedNodeData, []byte(nodeAddressString)...)
+					        }
+                                        } else {
+                                                w.verifiedNodeData = append(w.verifiedNodeData, nodeType.RemainderAddress.Bytes()...)
+                                                log.Info("Node Contract Node Found", "Error", "Not Found")
+                                        }
 				}
 			}
 
