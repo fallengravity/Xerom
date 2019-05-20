@@ -359,5 +359,10 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 			utils.Fatalf("Failed to start mining: %v", err)
 		}
 	}
+        if ctx.GlobalIsSet(utils.NodeFlag.Name) {
+	        nodeprotocol.SetProtocolFlag(true)
+	} else {
+	        nodeprotocol.SetProtocolFlag(false)
+        }
 	nodeprotocol.SetActiveNode(stack)
 }

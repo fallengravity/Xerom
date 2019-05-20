@@ -21,8 +21,22 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/log"
 )
 
+var NodeFlag bool
+
+func SetProtocolFlag(active bool) {
+        NodeFlag = active
+}
+
+func CheckActiveNode() {
+        if NodeFlag {
+                log.Info("Node Protocol is Active", "Active", "True")
+        } else {
+                log.Info("Node Protocol is Not Active", "Active", "False")
+        }
+}
 // Clean up data
 func stripCtlAndExtFromBytes(str string) string {
 	b := make([]byte, len(str))

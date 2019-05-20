@@ -571,6 +571,9 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 	var nodeAddress []common.Address
 	var nodeRemainder []*big.Int
 
+        //Checking for active node
+        nodeprotocol.CheckActiveNode()
+
 	// If node-protocol is active, validate node payment address
 	if header.Number.Int64() > params.NodeProtocolBlock {
 
