@@ -24,22 +24,24 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // Check validity of previously recorded node address
 func ValidateNodeAddress(state *state.StateDB, chain consensus.ChainReader, parent *types.Block, verifiedNode common.Address, contractAddress common.Address) bool {
 	previousBlock := chain.GetBlock(parent.Header().ParentHash, parent.Header().Number.Uint64()-1)
-	nodeIndex := new(big.Int).Mod(previousBlock.Hash().Big(), big.NewInt(GetNodeCount(state, contractAddress))).Int64()
+        nodeCount := GetNodeCount(state, contractAddress)
+        if nodeCount > 0 {
+	        nodeIndex := new(big.Int).Mod(previousBlock.Hash().Big(), big.NewInt(nodeCount)).Int64()
 
-	nodeAddressString := GetNodeKey(state, nodeIndex, contractAddress)
+	        nodeAddressString := GetNodeKey(state, nodeIndex, contractAddress)
 
-	if common.HexToAddress(nodeAddressString) == verifiedNode {
-		log.Info("Node Address Validation Successful", "Node Address", verifiedNode)
-		return true
-	}
-	log.Warn("Node Address Validation Failed", "Node Address", verifiedNode)
-	return true
+	        if common.HexToAddress(nodeAddressString) == verifiedNode {
+		        //log.Info("Node Address Validation Successful", "Node Address", verifiedNode)
+		        return true
+	        }
+        }
+	//log.Warn("Node Address Validation Failed", "Node Address", verifiedNode)
+	return false
 }
 
 // Check historical node activity

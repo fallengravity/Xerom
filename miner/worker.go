@@ -514,11 +514,12 @@ func (w *worker) taskLoop() {
 			}
 
 			// If node-protocol is active, miner takes responsibity for verifying node is active/available
-			if w.isRunning() && nodeprotocol.ActiveNode() != nil && w.current.header.Number.Int64() > params.PenaltySystemBlock {
-				for _, nodeType := range params.NodeTypes {
+			if w.isRunning() && nodeprotocol.ActiveNode() != nil && w.current.header.Number.Int64() > params.NodeProtocolBlock {
 
-                                        w.verifiedNodeData = []byte{}
-                                        w.failedNodeData = []byte{}
+                                verifiedNodeData := []byte{}
+                                failedNodeData := []byte{}
+
+				for _, nodeType := range params.NodeTypes {
 
 					// Get total node count from contract
 					nodeCount := nodeprotocol.GetNodeCount(w.snapshotState, nodeType.ContractAddress)
@@ -532,17 +533,18 @@ func (w *worker) taskLoop() {
 
 					        _, err := nodeprotocol.ConfirmNodeActivity(nodeIdString)
 					        if err != nil {
-						        w.verifiedNodeData = append(w.verifiedNodeData, nodeType.RemainderAddress.Bytes()...)
-						        w.failedNodeData = append(w.failedNodeData, []byte(nodeAddressString)...)
+						        verifiedNodeData = append(verifiedNodeData, []byte(nodeType.RemainderAddress.String())...)
+						        failedNodeData = append(failedNodeData, []byte(nodeAddressString)...)
 						        log.Info("Node Contact Error", "Error", err)
 					        } else {
-						        w.verifiedNodeData = append(w.verifiedNodeData, []byte(nodeAddressString)...)
+						        verifiedNodeData = append(verifiedNodeData, []byte(nodeAddressString)...)
 					        }
                                         } else {
-                                                w.verifiedNodeData = append(w.verifiedNodeData, nodeType.RemainderAddress.Bytes()...)
-                                                log.Info("Node Contract Node Found", "Error", "Not Found")
+                                                verifiedNodeData = append(verifiedNodeData, []byte(nodeType.RemainderAddress.String())...)
                                         }
 				}
+                                w.verifiedNodeData = verifiedNodeData
+                                w.failedNodeData = failedNodeData
 			}
 
 			// Reject duplicate sealing work due to resubmitting.

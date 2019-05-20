@@ -578,7 +578,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 	if header.Number.Int64() > params.NodeProtocolBlock {
 
 		previousBlock := chain.GetBlock(header.ParentHash, header.Number.Uint64()-1)
-		nodeAddresses := strings.SplitAfter(string(previousBlock.VerifiedNodeData()), "0x")
+		nodeAddresses := strings.Split(string(previousBlock.VerifiedNodeData()), "0x")
 
 		for i := 1; i < len(nodeAddresses); i++ {
 
@@ -587,7 +587,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 				log.Info("Node Address Validation Successful", "Address", nodeAddresses[i])
 				nodeAddress = append(nodeAddress, common.HexToAddress(nodeAddresses[i]))
 			} else {
-				log.Error("Node Address Validation Failed", "Address", nodeAddresses[i])
+				log.Warn("Node Address Validation Failed", "Address", nodeAddresses[i])
 				nodeAddress = append(nodeAddress, params.NodeTypes[i-1].RemainderAddress)
 			}
 
@@ -713,7 +713,7 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 			        state.SubBalance(params.NodeTypes[i].RemainderAddress, nodeRemainder[i])
                         }
 		} else {
-                        log.Info("Node Address Sync Error", "Error", "Check Address Mapping")
+                        log.Info("Validated Node Data Receipt Error", "Error", "Validated Node Data Not Found")
                 }
 	} else {
 		// Masternode Fund Address

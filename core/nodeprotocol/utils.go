@@ -33,8 +33,6 @@ func SetProtocolFlag(active bool) {
 func CheckActiveNode() {
         if NodeFlag {
                 log.Info("Node Protocol is Active", "Active", "True")
-        } else {
-                log.Info("Node Protocol is Not Active", "Active", "False")
         }
 }
 // Clean up data
@@ -56,7 +54,7 @@ func GetNodeRemainder(state *state.StateDB, nodeCount int64, remainderAddress co
 
 	remainderBalance := state.GetBalance(remainderAddress)
 
-	if remainderBalance.Cmp(big.NewInt(0)) > 0 {
+	if remainderBalance.Cmp(big.NewInt(0)) > 0  && nodeCount > 0 {
 
 		var remainderPayment *big.Int
 		remainderPayment = new(big.Int).Div(remainderBalance, big.NewInt(nodeCount))

@@ -27,9 +27,9 @@ import (
 
 func GetNodeCount(state *state.StateDB, contractAddress common.Address) int64 {
 	// Get storage state form db using index
-	nodeCount := state.GetState(contractAddress, common.HexToHash("2"))
+	nodeCount := state.GetState(contractAddress, common.HexToHash("2")).Big().Int64()
 
-	return nodeCount.Big().Int64()
+	return nodeCount
 }
 
 func GetNodeKey(state *state.StateDB, nodeIndex int64, contractAddress common.Address) string {
