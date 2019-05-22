@@ -589,7 +589,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 		for i := 0; i < len(nodeAddress); i++ {
 
 			contractAddress := params.NodeTypes[i].ContractAddress
-			if nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, nodeAddress[i], contractAddress) && !contains(disqualifiedNodes, nodeAddress[i]) {
+			if nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, nodeAddress[i], contractAddress) && !checkDisqualifiedNodes(disqualifiedNodes, nodeAddress[i]) {
 				log.Info("Node Address Validation Successful", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
 			} else {
 				log.Warn("Node Address Validation Failed", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
@@ -609,9 +609,10 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 	return types.NewBlock(header, txs, uncles, receipts), nil
 }
 
-func contains(arr []common.Address, compare common.Address) bool {
+func checkDisqualifiedNodes(arr []common.Address, compare common.Address) bool {
         for _, a := range arr {
                 if a == compare {
+                        log.Info("Checking Previously Inactive Nodes", "Node Disqualified", compare)
                         return true
                 }
         }

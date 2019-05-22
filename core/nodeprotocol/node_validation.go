@@ -24,7 +24,6 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // Check validity of previously recorded node address
@@ -46,7 +45,8 @@ func ValidateNodeAddress(state *state.StateDB, chain consensus.ChainReader, pare
 // Check historical node activity
 func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verifiedNodes []common.Address) []common.Address {
         // Random number of blocks to check history - to deter bad actors
-        blockLookBack := new(big.Int).Mod(parent.Hash().Big(), big.NewInt(1000)).Int64()
+        //blockLookBack := new(big.Int).Mod(parent.Hash().Big(), big.NewInt(6646)).Int64()  // Seeded random lookback
+        blockLookBack := int64(6646)  // Fixed lookback
         if parent.Header().Number.Int64() < blockLookBack {
                 blockLookBack = parent.Header().Number.Int64()
         }
@@ -54,26 +54,49 @@ func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verified
         // Loop through blocks to check for node inactivity
         var disqualifiedNodes []common.Address
         var parentBlock = parent
+
+        nodes := make([]common.Address, len(verifiedNodes))
+        copy(nodes, verifiedNodes)
+
+        checkNodes := make([]common.Address, len(verifiedNodes))
+        copy(checkNodes, verifiedNodes)
+
         for i := int64(0); i < blockLookBack; i++ {
                 historicalBlock := chain.GetBlock(parentBlock.Header().ParentHash, parentBlock.Header().Number.Uint64()-1)
 
-                var checkNodes []common.Address
-                var nodes []common.Address
-                copy(checkNodes, verifiedNodes)
-                copy(nodes, verifiedNodes)
+                var failedNodes []common.Address
+
+                splitNodes := strings.Split(string(historicalBlock.FailedNodeData()), "0x")
+                for _, splitAddress := range splitNodes {
+                        failedNodes = append(failedNodes, common.HexToAddress(splitAddress))
+                }
 
                 for index, nodeAddress := range nodes {
-                        if strings.Contains(string(historicalBlock.Header().FailedNodeData), nodeAddress.String()) {
+                        if contains(failedNodes, nodeAddress) {
                                 disqualifiedNodes = append(disqualifiedNodes, nodeAddress)
-                                checkNodes[index] = checkNodes[len(checkNodes)-1] // Copy last element to index.
-                                checkNodes[len(checkNodes)-1] = common.HexToAddress("0x0")   // Erase last element (write zero value).
-                                checkNodes = checkNodes[:len(checkNodes)-1]
-                                log.Info("Node Found as Inactive", "Status", "Disqualified")
+                                checkNodes = removeElement(nodes, index)
                         }
                 }
 
                 // Set new parent block
                 parentBlock = historicalBlock
+                nodes = make([]common.Address, len(checkNodes))
+                copy(nodes, checkNodes)
+
         }
         return disqualifiedNodes
+}
+
+func contains(s []common.Address, e common.Address) bool {
+        for _, a := range s {
+                if a == e {
+                        return true
+                }
+        }
+        return false
+}
+
+func removeElement(s []common.Address, i int) []common.Address {
+        s[i] = s[len(s)-1]
+        return s[:len(s)-1]
 }
