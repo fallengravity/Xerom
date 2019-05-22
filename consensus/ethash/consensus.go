@@ -571,6 +571,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
         penalizeMiner := false // Default is to not penalize previous block author/miner
 
 	var nodeAddress []common.Address
+	var nodeCounts []int64
 	var nodeRemainder []*big.Int
 
         //Checking for active node
@@ -585,13 +586,15 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 
 		for i := 1; i < len(nodeAddresses); i++ {
                        nodeAddress = append(nodeAddress, common.HexToAddress(nodeAddresses[i]))
+                       nodeCounts = append(nodeCounts, nodeprotocol.GetNodeCount(state, params.NodeTypes[i-1].ContractAddress))
                 }
 
-                disqualifiedNodes := nodeprotocol.CheckNodeHistory(chain, previousBlock, nodeAddress)
+                disqualifiedNodes := nodeprotocol.CheckNodeHistory(chain, previousBlock, nodeAddress, nodeCounts)
 
 		for i := 0; i < len(nodeAddress); i++ {
 
 			contractAddress := params.NodeTypes[i].ContractAddress
+
 			if nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, nodeAddress[i], contractAddress) {
 			        if checkDisqualifiedNodes(disqualifiedNodes, nodeAddress[i]) {
                                         log.Warn("Node Disqualified - Previously Inactive", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
@@ -609,7 +612,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			}
 
 			// Get reward remainder from previous bad reward validations
-			nodeRemainder = append(nodeRemainder, nodeprotocol.GetNodeRemainder(state, nodeprotocol.GetNodeCount(state, contractAddress), params.NodeTypes[i].RemainderAddress))
+			nodeRemainder = append(nodeRemainder, nodeprotocol.GetNodeRemainder(state, nodeCounts[i], params.NodeTypes[i].RemainderAddress))
 		}
 	}
 

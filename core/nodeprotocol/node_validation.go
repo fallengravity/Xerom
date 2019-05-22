@@ -43,14 +43,24 @@ func ValidateNodeAddress(state *state.StateDB, chain consensus.ChainReader, pare
 }
 
 // Check historical node activity
-func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verifiedNodes []common.Address) []common.Address {
+func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verifiedNodes []common.Address, nodeCounts []int64) []common.Address {
         // Random number of blocks to check history - to deter bad actors
         //blockLookBack := new(big.Int).Mod(parent.Hash().Big(), big.NewInt(6646)).Int64()  // Seeded random lookback
         blockLookBack := int64(6646)  // Fixed lookback
+
+        // Map for node failure counts
+        var NodeInactivityCounts map[common.Address]int
+        NodeInactivityCounts = make(map[common.Address]int)
+        var NodeCounts map[common.Address]int
+        NodeCounts = make(map[common.Address]int)
+
         if parent.Header().Number.Int64() < blockLookBack {
                 blockLookBack = parent.Header().Number.Int64()
         }
 
+        for index, nodeAddress := range verifiedNodes {
+                NodeCounts[nodeAddress] = int(nodeCounts[index])
+        }
         // Loop through blocks to check for node inactivity
         var disqualifiedNodes []common.Address
         var parentBlock = parent
@@ -72,9 +82,13 @@ func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verified
                 }
 
                 for index, nodeAddress := range nodes {
-                        if contains(failedNodes, nodeAddress) {
-                                disqualifiedNodes = append(disqualifiedNodes, nodeAddress)
-                                checkNodes = removeElement(nodes, index)
+                        if contains(failedNodes, nodeAddress) && NodeCounts[nodeAddress] > 0 {
+                                if NodeInactivityCounts[nodeAddress] > (6646 / (NodeCounts[nodeAddress] * 48)) {
+                                        disqualifiedNodes = append(disqualifiedNodes, nodeAddress)
+                                        checkNodes = removeElement(nodes, index)
+                                } else {
+                                        NodeInactivityCounts[nodeAddress]++
+                                }
                         }
                 }
 
