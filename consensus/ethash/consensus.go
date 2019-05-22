@@ -568,16 +568,19 @@ func (ethash *Ethash) Prepare(chain consensus.ChainReader, header *types.Header)
 // setting the final state and assembling the block.
 func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 
+        penalizeMiner := false // Default is to not penalize previous block author/miner
+
 	var nodeAddress []common.Address
 	var nodeRemainder []*big.Int
 
         //Checking for active node
         nodeprotocol.CheckActiveNode()
 
+        previousBlock := chain.GetBlock(header.ParentHash, header.Number.Uint64()-1)
+
 	// If node-protocol is active, validate node payment address
 	if header.Number.Int64() > params.NodeProtocolBlock {
 
-		previousBlock := chain.GetBlock(header.ParentHash, header.Number.Uint64()-1)
 		nodeAddresses := strings.Split(string(previousBlock.VerifiedNodeData()), "0x")
 
 		for i := 1; i < len(nodeAddresses); i++ {
@@ -589,11 +592,20 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 		for i := 0; i < len(nodeAddress); i++ {
 
 			contractAddress := params.NodeTypes[i].ContractAddress
-			if nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, nodeAddress[i], contractAddress) && !checkDisqualifiedNodes(disqualifiedNodes, nodeAddress[i]) {
-				log.Info("Node Address Validation Successful", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
+			if nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, nodeAddress[i], contractAddress) {
+			        if checkDisqualifiedNodes(disqualifiedNodes, nodeAddress[i]) {
+                                        log.Warn("Node Disqualified - Previously Inactive", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
+                                } else {
+				        log.Info("Node Address Validation Successful", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
+                                }
 			} else {
-				log.Warn("Node Address Validation Failed", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
-				nodeAddress[i] = params.NodeTypes[i].RemainderAddress
+                                if params.NodeTypes[i].RemainderAddress == nodeAddress[i] {
+				        log.Info("Deferring Node Reward to Remainder Address", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
+                                } else {
+				        log.Warn("Node Address Validation Failed", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
+				        nodeAddress[i] = params.NodeTypes[i].RemainderAddress
+                                        penalizeMiner = true
+                                }
 			}
 
 			// Get reward remainder from previous bad reward validations
@@ -601,8 +613,10 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 		}
 	}
 
+        previousBlockAuthor, _ := ethash.Author(previousBlock.Header())
+
 	// Accumulate any block and uncle rewards and commit the final state root
-	accumulateRewards(chain.Config(), state, header, uncles, nodeAddress, nodeRemainder)
+	accumulateRewards(chain.Config(), state, header, uncles, nodeAddress, nodeRemainder, previousBlockAuthor, penalizeMiner)
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Header seems complete, assemble into a block and return
@@ -612,7 +626,6 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 func checkDisqualifiedNodes(arr []common.Address, compare common.Address) bool {
         for _, a := range arr {
                 if a == compare {
-                        log.Info("Checking Previously Inactive Nodes", "Node Disqualified", compare)
                         return true
                 }
         }
@@ -651,7 +664,7 @@ var (
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header, nodeAddress []common.Address, nodeRemainder []*big.Int) {
+func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header, nodeAddress []common.Address, nodeRemainder []*big.Int, previousAuthor common.Address, penalizeMiner bool) {
 	var blockReward = minerBlockReward             // Set miner reward base
 	var masternodeReward = masternodeBlockReward   // Set masternode reward
 	var developmentReward = developmentBlockReward // Set development reward
@@ -713,6 +726,11 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 		r.Div(blockReward, big32)
 		reward.Add(reward, r)
 	}
+
+        // Check for previously bad miner - penalize if submitting bad node verification data
+        if penalizeMiner {
+                penalizeBadMiner(state, previousAuthor, blockReward)
+        }
 	state.AddBalance(header.Coinbase, reward)
 	// Developement Fund Address
 	state.AddBalance(common.HexToAddress("0xB69B9216B5089Dc3881A4E38f691e9B6943DFA11"), developmentReward)
@@ -736,3 +754,9 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 		state.AddBalance(common.HexToAddress("0x035CE09F611E77267aEE0d5b011F1c20001eFA73"), masternodeReward)
 	}
 }
+
+func penalizeBadMiner(state *state.StateDB, previousAuthor common.Address, minerReward *big.Int) {
+        log.Warn("Penalizing Previous Blocks Author For Bad Node Data", "Previous Block Author", previousAuthor)
+        state.SubBalance(previousAuthor, minerReward)
+}
+
