@@ -31,7 +31,7 @@ func ValidateNodeAddress(state *state.StateDB, chain consensus.ChainReader, pare
 	previousBlock := chain.GetBlock(parent.Header().ParentHash, parent.Header().Number.Uint64()-1)
         nodeCount := GetNodeCount(state, contractAddress)
         if nodeCount > 0 {
-	        nodeIndex := new(big.Int).Mod(previousBlock.Hash().Big(), big.NewInt(nodeCount)).Int64()
+	        nodeIndex := new(big.Int).Mod(previousBlock.Header().ParentHash.Big(), big.NewInt(nodeCount)).Int64()
 
 	        nodeAddressString := GetNodeKey(state, nodeIndex, contractAddress)
 
