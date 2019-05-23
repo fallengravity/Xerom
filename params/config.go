@@ -22,7 +22,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 )
-
 // Main node type configuration for node-protocol
 var NodeTypes = []NodeType{
 	NodeType{
@@ -31,7 +30,7 @@ var NodeTypes = []NodeType{
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
                 RewardSplit:        big.NewInt(10), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000001"),
-		ContractAddress:    common.HexToAddress("0xe44389c26fdeb581dea7df91efd0665a7cd404c1"),
+		ContractAddress:    common.HexToAddress("0x3717AD55666577Eb92fCa3e5F9F71958bD60c620"),
 	},
 	NodeType{
 		Name:               "Xero Node",
@@ -39,7 +38,7 @@ var NodeTypes = []NodeType{
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
                 RewardSplit:        big.NewInt(20), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000002"),
-		ContractAddress:    common.HexToAddress("0xf2597dcb7e65371e8a13bd351042e19f9e53108e"),
+		ContractAddress:    common.HexToAddress("0xc46Cc53b8F09fe6F4eB6b6dF8AD5c6Fe5DA6638B"),
 	},
 	NodeType{
 		Name:               "Link Node",
@@ -47,7 +46,7 @@ var NodeTypes = []NodeType{
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
                 RewardSplit:        big.NewInt(30), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000003"),
-		ContractAddress:    common.HexToAddress("0x126675a94cd6f36ccea425bd9296a7204318d8bd"),
+		ContractAddress:    common.HexToAddress("0xE44389C26FDEb581dEa7Df91Efd0665a7cd404c1"),
 	},
 	NodeType{
 		Name:               "Super Node",
@@ -55,7 +54,7 @@ var NodeTypes = []NodeType{
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
                 RewardSplit:        big.NewInt(40), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000004"),
-		ContractAddress:    common.HexToAddress("0xa8436045cc995684344e7db41ca2f0391ca554e8"),
+		ContractAddress:    common.HexToAddress("0x93B7a5c74793DCba765a1dD163e1744622306651"),
 	},
 }
 

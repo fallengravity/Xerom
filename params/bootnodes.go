@@ -16,9 +16,11 @@
 
 package params
 
-// Ether-1 Bootnodes
+// Xerom Bootnodes
 var MainnetBootnodes = []string{
-	// Ether-1 Bootnodes
+	// Xerom Bootnodes
+        "enode://22b31e7fd3cf44072387d7e3765bfac545b9e623746e3ca19233b010997d6074a36e0851d8fe6fda98964315c81d445e5a2ba077960d9950446c514d56e61224@149.28.49.244:30305",
+
 }
 
 // TestnetBootnodes are the enode URLs of the P2P bootstrap nodes running on the

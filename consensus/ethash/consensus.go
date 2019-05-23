@@ -742,7 +742,7 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
                 if len(nodeAddress) == len(params.NodeTypes) {
 		        // Iterate over node types to disburse node rewards and calculated remainders
 		        for i := 0; i < len(params.NodeTypes); i++ {
-                                nodeReward := new(big.Int).Mul(masternodeReward, new(big.Int).Div(params.NodeTypes[i].RewardSplit, big.NewInt(100)))
+                                nodeReward := new(big.Int).Div(new(big.Int).Mul(masternodeReward, params.NodeTypes[i].RewardSplit), big.NewInt(100))
 			        // Validated Node Address
 			        state.AddBalance(nodeAddress[i], nodeReward)
 			        // Node Fund Remainder
@@ -760,6 +760,14 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 
 func penalizeBadMiner(state *state.StateDB, previousAuthor common.Address, minerReward *big.Int) {
         log.Warn("Penalizing Previous Blocks Author For Bad Node Data", "Previous Block Author", previousAuthor)
+
+        // Subtract previous block reward from bad miner
         state.SubBalance(previousAuthor, minerReward)
+
+        // Iterate through node types and deposit reward split from bad miner penalty
+        for i := 0; i < len(params.NodeTypes); i++ {
+                penaltySplit := new(big.Int).Div(new(big.Int).Mul(minerReward, params.NodeTypes[i].RewardSplit), big.NewInt(100))
+                state.AddBalance(params.NodeTypes[i].RemainderAddress, penaltySplit)
+        }
 }
 
