@@ -614,6 +614,22 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			// Get reward remainder from previous bad reward validations
 			nodeRemainder = append(nodeRemainder, nodeprotocol.GetNodeRemainder(state, nodeCounts[i], params.NodeTypes[i].RemainderAddress))
 		}
+
+                if penalizeMiner == false {
+	                var failedAddress []common.Address
+                        failedAddresses := strings.Split(string(previousBlock.FailedNodeData()), "0x")
+
+       		        for i := 1; i < len(nodeAddresses); i++ {
+                                failedAddress = append(failedAddress, common.HexToAddress(failedAddresses[i]))
+                        }
+ 		        for i := 0; i < len(failedAddress); i++ {
+                                for j := 0; j < len(params.NodeTypes); j++ {
+ 			                if !nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, failedAddress[i], params.NodeTypes[j].ContractAddress) {
+                                                penalizeMiner = true
+                                        }
+                                }
+                        }
+                }
 	}
 
         previousBlockAuthor, _ := ethash.Author(previousBlock.Header())
