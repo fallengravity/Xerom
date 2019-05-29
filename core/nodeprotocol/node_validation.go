@@ -44,8 +44,7 @@ func ValidateNodeAddress(state *state.StateDB, chain consensus.ChainReader, pare
 // Check historical node activity
 func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verifiedNodes []common.Address, nodeCounts []uint64) []common.Address {
         // Random number of blocks to check history - to deter bad actors
-        //blockLookBack := new(big.Int).Mod(parent.Hash().Big(), big.NewInt(6646)).Int64()  // Seeded random lookback
-        blockLookBack := int64(6646)  // Fixed lookback
+        blockLookBack := int64(552)  // Fixed lookback - Roughly Hourly Block Count
 
         // Map for node failure counts
         var NodeInactivityCounts map[common.Address]int
@@ -77,7 +76,13 @@ func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verified
 
                 for index, nodeAddress := range nodes {
                         if contains(failedNodes, nodeAddress) && NodeCounts[nodeAddress] > 0 {
-                                if NodeInactivityCounts[nodeAddress] > (6646 / (NodeCounts[nodeAddress] * 48)) {
+
+                                // Set max inactivity count for previous period based on node count
+                                // Multiplier of (4) is based on lookback period of roughly 2 hours
+                                allowableInactivityCount := (blockLookBack / (int64(NodeCounts[nodeAddress]) * int64(4)))
+
+                                // Check for inactivity & disqualify nodes if needed
+                                if int64(NodeInactivityCounts[nodeAddress]) > allowableInactivityCount {
                                         disqualifiedNodes = append(disqualifiedNodes, nodeAddress)
                                         checkNodes = removeElement(nodes, index)
                                 } else {
