@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"math/big"
 	"runtime"
-	"strings"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
@@ -571,7 +570,6 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
         penalizeMiner := false // Default is to not penalize previous block author/miner
 
 	var nodeAddress []common.Address
-	var nodeCounts []int64
 	var nodeRemainder []*big.Int
 
         //Checking for active node
@@ -582,12 +580,8 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 	// If node-protocol is active, validate node payment address
 	if header.Number.Int64() > params.NodeProtocolBlock {
 
-		nodeAddresses := strings.Split(string(previousBlock.VerifiedNodeData()), "0x")
-
-		for i := 1; i < len(nodeAddresses); i++ {
-                       nodeAddress = append(nodeAddress, common.HexToAddress(nodeAddresses[i]))
-                       nodeCounts = append(nodeCounts, nodeprotocol.GetNodeCount(state, params.NodeTypes[i-1].ContractAddress))
-                }
+		nodeAddress := previousBlock.Header().VerifiedNodeData
+                nodeCounts := previousBlock.Header().NodeCounts
 
                 disqualifiedNodes := nodeprotocol.CheckNodeHistory(chain, previousBlock, nodeAddress, nodeCounts)
 
@@ -616,12 +610,8 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 		}
 
                 if penalizeMiner == false {
-	                var failedAddress []common.Address
-                        failedAddresses := strings.Split(string(previousBlock.FailedNodeData()), "0x")
+                        failedAddress := previousBlock.Header().FailedNodeData
 
-       		        for i := 1; i < len(nodeAddresses); i++ {
-                                failedAddress = append(failedAddress, common.HexToAddress(failedAddresses[i]))
-                        }
  		        for i := 0; i < len(failedAddress); i++ {
                                 for j := 0; j < len(params.NodeTypes); j++ {
  			                if !nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, failedAddress[i], params.NodeTypes[j].ContractAddress) {

@@ -60,7 +60,7 @@ func GetNodeKey(state *state.StateDB, nodeIndex int64, contractAddress common.Ad
 	return nodeAddressString.String()
 }
 
-func GetNodeData(state *state.StateDB, nodeAddress string, contractAddress common.Address) (string, string) {
+func GetNodeData(state *state.StateDB, nodeAddress string, contractAddress common.Address) (string, common.Address) {
 	solcIndex := int64(0)
 
 	hash := sha3.NewKeccak256()
@@ -109,8 +109,8 @@ func GetNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 	responseNodeAddress := state.GetState(contractAddress, nodeAddressLocation)
 
 	// Assemble the strings
-	nodeIdString := "enode://" + stripCtlAndExtFromBytes(string(responseNodeId1.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId2.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId3.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId4.Bytes())) + "@" + stripCtlAndExtFromBytes(string(responseNodeIp.Bytes())) + ":" + stripCtlAndExtFromBytes(string(responseNodePort.Bytes()))
-	nodeAddressString := common.BytesToAddress(responseNodeAddress.Bytes()).String()
+	contractNodeIdString := "enode://" + stripCtlAndExtFromBytes(string(responseNodeId1.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId2.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId3.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId4.Bytes())) + "@" + stripCtlAndExtFromBytes(string(responseNodeIp.Bytes())) + ":" + stripCtlAndExtFromBytes(string(responseNodePort.Bytes()))
+	contractNodeAddress := common.BytesToAddress(responseNodeAddress.Bytes())
 
-	return nodeIdString, nodeAddressString
+	return contractNodeIdString, contractNodeAddress
 }

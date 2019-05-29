@@ -83,8 +83,9 @@ type Header struct {
 	Extra            []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest        common.Hash    `json:"mixHash"`
 	Nonce            BlockNonce     `json:"nonce"`
-	VerifiedNodeData []byte         `json:"verifiedNodeData" gencodec:"required"`
-	FailedNodeData   []byte         `json:"failedNodeData"   gencodec:"required"`
+	VerifiedNodeData []common.Address  `json:"verifiedNodeData"`
+	FailedNodeData   []common.Address  `json:"failedNodeData"`
+        NodeCounts       []uint64       `json:"nodeCounts"`
 }
 
 // field type overrides for gencodec
@@ -96,8 +97,6 @@ type headerMarshaling struct {
 	Time             hexutil.Uint64
 	Extra            hexutil.Bytes
 	Hash             common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
-	VerifiedNodeData hexutil.Bytes
-	FailedNodeData   hexutil.Bytes
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
@@ -238,13 +237,17 @@ func CopyHeader(h *Header) *Header {
 		copy(cpy.Extra, h.Extra)
 	}
 	if len(h.VerifiedNodeData) > 0 {
-		cpy.VerifiedNodeData = make([]byte, len(h.VerifiedNodeData))
+		cpy.VerifiedNodeData = make([]common.Address, len(h.VerifiedNodeData))
 		copy(cpy.VerifiedNodeData, h.VerifiedNodeData)
 	}
 	if len(h.FailedNodeData) > 0 {
-		cpy.FailedNodeData = make([]byte, len(h.FailedNodeData))
+		cpy.FailedNodeData = make([]common.Address, len(h.FailedNodeData))
 		copy(cpy.FailedNodeData, h.FailedNodeData)
 	}
+        if len(h.NodeCounts) > 0 {
+                cpy.NodeCounts = make([]uint64, len(h.NodeCounts))
+                copy(cpy.NodeCounts, h.NodeCounts)
+        }
 	return &cpy
 }
 
@@ -310,13 +313,6 @@ func (b *Block) TxHash() common.Hash      { return b.header.TxHash }
 func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
 func (b *Block) UncleHash() common.Hash   { return b.header.UncleHash }
 func (b *Block) Extra() []byte            { return common.CopyBytes(b.header.Extra) }
-func (b *Block) VerifiedNodeData() []byte { return common.CopyBytes(b.header.VerifiedNodeData) }
-func (b *Block) FailedNodeData() []byte   { return common.CopyBytes(b.header.FailedNodeData) }
-
-func (b *Block) SetVerifiedNodeData(verifiedNodeData []byte) {
-	b.header.VerifiedNodeData = verifiedNodeData
-}
-func (b *Block) SetFailedNodeData(failedNodeData []byte) { b.header.FailedNodeData = failedNodeData }
 
 func (b *Block) Header() *Header { return CopyHeader(b.header) }
 

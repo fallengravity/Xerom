@@ -50,14 +50,14 @@ func stripCtlAndExtFromBytes(str string) string {
 }
 
 // Calculate and return node remainder balance payment share
-func GetNodeRemainder(state *state.StateDB, nodeCount int64, remainderAddress common.Address) *big.Int {
+func GetNodeRemainder(state *state.StateDB, nodeCount uint64, remainderAddress common.Address) *big.Int {
 
 	remainderBalance := state.GetBalance(remainderAddress)
 
 	if remainderBalance.Cmp(big.NewInt(0)) > 0  && nodeCount > 0 {
 
 		var remainderPayment *big.Int
-		remainderPayment = new(big.Int).Div(remainderBalance, big.NewInt(nodeCount))
+		remainderPayment = new(big.Int).Div(remainderBalance, big.NewInt(int64(nodeCount)))
 
 		return remainderPayment
 	}

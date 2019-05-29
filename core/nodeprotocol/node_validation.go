@@ -18,7 +18,6 @@ package nodeprotocol
 
 import (
 	"math/big"
-        "strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -43,7 +42,7 @@ func ValidateNodeAddress(state *state.StateDB, chain consensus.ChainReader, pare
 }
 
 // Check historical node activity
-func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verifiedNodes []common.Address, nodeCounts []int64) []common.Address {
+func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verifiedNodes []common.Address, nodeCounts []uint64) []common.Address {
         // Random number of blocks to check history - to deter bad actors
         //blockLookBack := new(big.Int).Mod(parent.Hash().Big(), big.NewInt(6646)).Int64()  // Seeded random lookback
         blockLookBack := int64(6646)  // Fixed lookback
@@ -74,12 +73,7 @@ func CheckNodeHistory(chain consensus.ChainReader, parent *types.Block, verified
         for i := int64(0); i < blockLookBack; i++ {
                 historicalBlock := chain.GetBlock(parentBlock.Header().ParentHash, parentBlock.Header().Number.Uint64()-1)
 
-                var failedNodes []common.Address
-
-                splitNodes := strings.Split(string(historicalBlock.FailedNodeData()), "0x")
-                for _, splitAddress := range splitNodes {
-                        failedNodes = append(failedNodes, common.HexToAddress(splitAddress))
-                }
+                var failedNodes = historicalBlock.Header().FailedNodeData
 
                 for index, nodeAddress := range nodes {
                         if contains(failedNodes, nodeAddress) && NodeCounts[nodeAddress] > 0 {
