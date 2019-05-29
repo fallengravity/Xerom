@@ -580,7 +580,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 	// If node-protocol is active, validate node payment address
 	if header.Number.Int64() > params.NodeProtocolBlock {
 
-		nodeAddress := previousBlock.Header().VerifiedNodeData
+		nodeAddress = previousBlock.Header().VerifiedNodeData
                 nodeCounts := previousBlock.Header().NodeCounts
 
                 disqualifiedNodes := nodeprotocol.CheckNodeHistory(chain, previousBlock, nodeAddress, nodeCounts)
@@ -612,11 +612,18 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
                 if penalizeMiner == false {
                         failedAddress := previousBlock.Header().FailedNodeData
 
- 		        for i := 0; i < len(failedAddress); i++ {
-                                for j := 0; j < len(params.NodeTypes); j++ {
- 			                if !nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, failedAddress[i], params.NodeTypes[j].ContractAddress) {
-                                                penalizeMiner = true
+                        if len(failedAddress) > 0 {
+                                validationFlag := false
+
+ 		                for i := 0; i < len(failedAddress); i++ {
+                                        for j := 0; j < len(params.NodeTypes); j++ {
+ 			                        if nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, failedAddress[i], params.NodeTypes[j].ContractAddress) {
+                                                        validationFlag = true
+                                                }
                                         }
+                                }
+                                if validationFlag == false {
+                                        penalizeMiner = true
                                 }
                         }
                 }
@@ -736,10 +743,6 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 		reward.Add(reward, r)
 	}
 
-        // Check for previously bad miner - penalize if submitting bad node verification data
-        if penalizeMiner {
-                penalizeBadMiner(state, previousAuthor, blockReward)
-        }
 	state.AddBalance(header.Coinbase, reward)
 	// Developement Fund Address
 	state.AddBalance(common.HexToAddress("0xB69B9216B5089Dc3881A4E38f691e9B6943DFA11"), developmentReward)
@@ -756,12 +759,16 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 			        state.SubBalance(params.NodeTypes[i].RemainderAddress, nodeRemainder[i])
                         }
 		} else {
-                        log.Info("Validated Node Data Receipt Error", "Error", "Validated Node Data Not Found")
+                        // Check for incorrect node data/address reciept - if not penalize miner for bad data
+                        log.Warn("Validated Node Data Receipt Error", "Error", "Validated Node Data Not Found")
+                        penalizeMiner = true
                 }
-	} else {
-		// Masternode Fund Address
-		state.AddBalance(common.HexToAddress("0x035CE09F611E77267aEE0d5b011F1c20001eFA73"), masternodeReward)
 	}
+
+        // Check for previously bad miner - penalize if submitting bad node verification data
+        if penalizeMiner {
+                penalizeBadMiner(state, previousAuthor, blockReward)
+        }
 }
 
 func penalizeBadMiner(state *state.StateDB, previousAuthor common.Address, minerReward *big.Int) {
