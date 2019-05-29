@@ -54,10 +54,11 @@ func GetNodeRemainder(state *state.StateDB, nodeCount uint64, remainderAddress c
 
 	remainderBalance := state.GetBalance(remainderAddress)
 
-	if remainderBalance.Cmp(big.NewInt(0)) > 0  && nodeCount > 0 {
+	if remainderBalance.Cmp(big.NewInt(0)) > 0 && nodeCount > 0 {
 
+                // Disburse remainder funds over extended period using a full days block count as divisor
 		var remainderPayment *big.Int
-		remainderPayment = new(big.Int).Div(remainderBalance, big.NewInt(int64(nodeCount)))
+		remainderPayment = new(big.Int).Div(remainderBalance, big.NewInt(6646))
 
 		return remainderPayment
 	}
