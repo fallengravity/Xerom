@@ -18,14 +18,20 @@ package nodeprotocol
 
 import (
 	"fmt"
+        "io/ioutil"
+        "os/user"
+        "strconv"
+        "encoding/hex"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+        "github.com/ethereum/go-ethereum/crypto"
 )
 
 var activeNode *node.Node
+var nodeConsensusMap map[string]uint64
 
 func ActiveNode() *node.Node {
 	return activeNode
@@ -33,6 +39,31 @@ func ActiveNode() *node.Node {
 
 func SetActiveNode(stack *node.Node) {
 	activeNode = stack
+}
+
+// Get user home directory from env
+func getHomeDirectory() string {
+    usr, err := user.Current()
+    if err != nil {
+        fmt.Print(err)
+    }
+    return usr.HomeDir
+}
+
+// Retrieve nodekey and calculate enodeid
+func getNodeId() []byte {
+    b, err := ioutil.ReadFile(getHomeDirectory() + "/.xerom/geth/nodekey")
+    if err != nil {
+        fmt.Print(err)
+        return []byte{}
+    }
+    enodeId, err := crypto.HexToECDSA(string(b))
+    if err != nil {
+        fmt.Print(err)
+        return []byte{}
+    }
+    pubkeyBytes := crypto.FromECDSAPub(&enodeId.PublicKey)[1:]
+    return pubkeyBytes
 }
 
 func ConfirmNodeActivity(nodeID string) (bool, error) {
@@ -48,4 +79,46 @@ func ConfirmNodeActivity(nodeID string) (bool, error) {
 		return true, nil
 	}
 	return false, fmt.Errorf("Node Communication Error: %v", err)
+}
+
+// SetupNodeProtocolMap initiates node protocol mapping
+func SetupNodeProtocolMap() {
+        nodeConsensusMap = make(map[string]uint64)
+}
+
+// UpdateNodeProtocolMap updates mapping data to latest block height
+func UpdateNodeProtocolLocalBlock(newBlockHeight uint64) {
+
+        nodeId := hex.EncodeToString(getNodeId())
+        // Check to see if node protocl mapping has been initiated
+        if oldBlockHeight, ok := nodeConsensusMap[nodeId]; ok {
+                if newBlockHeight > oldBlockHeight {
+                        nodeConsensusMap[nodeId] = newBlockHeight
+                }
+        } else {
+                // Initiate node protocol mapping
+                SetupNodeProtocolMap()
+                nodeConsensusMap[nodeId] = newBlockHeight
+        }
+}
+
+// UpdateNodeProtocolMap updates mapping data to latest block heights
+// based on node messaging that has been received on node protocol layer
+func UpdateNodeProtocolData(nodeId string, newBlockHeight uint64) {
+        if oldBlockHeight, ok := nodeConsensusMap[nodeId]; ok {
+                if newBlockHeight > oldBlockHeight {
+                        nodeConsensusMap[nodeId] = newBlockHeight
+                }
+        } else {
+                nodeConsensusMap[nodeId] = newBlockHeight
+        }
+}
+
+// GetNodeProtocolMap returns node protocol mapping data
+func GetNodeProtocolData() [][]string {
+        var nodeConsensusData [][]string
+        for nodeId, blockHeight := range nodeConsensusMap {
+                nodeConsensusData = append(nodeConsensusData, []string{nodeId, strconv.FormatUint(blockHeight, 10)})
+        }
+        return nodeConsensusData
 }

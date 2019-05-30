@@ -25,11 +25,13 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+        "strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/fetcher"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -335,6 +337,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 // handleMsg is invoked whenever an inbound message is received from a remote
 // peer. The remote connection is torn down upon returning any error.
 func (pm *ProtocolManager) handleMsg(p *peer) error {
+
 	// Read the next message from the remote peer, and ensure it's fully consumed
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
@@ -347,6 +350,23 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 
 	// Handle the message depending on its contents
 	switch {
+
+	case msg.Code == NodeProtocolMsg:
+
+                var nodeProtocolMessage [][]string
+		if err := msg.Decode(&nodeProtocolMessage); err != nil {
+			return errResp(ErrDecode, "msg %v: %v", msg, err)
+		}
+                for _, value := range nodeProtocolMessage {
+                      blockHeight, err := strconv.ParseUint(value[1], 10, 64)
+                      if err != nil {
+                              log.Error("Node Protocol Messaging Error", "Error", "Bad Block Data")
+                      } else {
+                              nodeprotocol.UpdateNodeProtocolData(value[0], blockHeight)
+                              log.Warn("Node Protocol Message Received", "ID", value[0], "Block Height", blockHeight)
+                      }
+                }
+
 	case msg.Code == StatusMsg:
 		// Status messages should never arrive after the handshake
 		return errResp(ErrExtraStatusMsg, "uncontrolled status message")
@@ -745,6 +765,13 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 		}
 		log.Trace("Announced block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 	}
+
+        // Check to see if running active node protocol
+        if nodeprotocol.NodeFlag {
+                // Now initiate node protocol message broadcasting
+                go pm.nodeProtocolBroadcast()
+        }
+
 }
 
 // BroadcastTxs will propagate a batch of transactions to all peers which are not known to
@@ -764,6 +791,18 @@ func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 	for peer, txs := range txset {
 		peer.AsyncSendTransactions(txs)
 	}
+}
+
+// Node protocol message broadcast
+func (pm *ProtocolManager) nodeProtocolBroadcast() {
+        // Prepare message for sending
+        message := nodeprotocol.GetNodeProtocolData()
+
+        //message := []nodeEntry{{id: "TestNodeID1", block: 111111}, {id: "TestNodeID2", block: 222222}}
+        // Iterate through peerset and send node protocol mesasge
+        for _, peer := range pm.peers.Peers() {
+                p2p.Send(peer.rw, NodeProtocolMsg, message)
+        }
 }
 
 // Mined broadcast loop
