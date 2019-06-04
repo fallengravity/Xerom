@@ -30,6 +30,9 @@ var NodeTypes = []NodeType{
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
                 RewardSplit:        big.NewInt(10), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000001"),
+		AddressLocation:    common.HexToAddress("0x0000000000000000000000000000000000000005"),
+		NodeCountLocation:  common.HexToAddress("0x0000000000000000000000000000000000000011"),
+		RemainderLocation:  common.HexToAddress("0x0000000000000000000000000000000000000012"),
 		ContractAddress:    common.HexToAddress("0x3717AD55666577Eb92fCa3e5F9F71958bD60c620"),
 	},
 	NodeType{
@@ -38,6 +41,9 @@ var NodeTypes = []NodeType{
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
                 RewardSplit:        big.NewInt(20), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000002"),
+		AddressLocation:    common.HexToAddress("0x0000000000000000000000000000000000000006"),
+		NodeCountLocation:  common.HexToAddress("0x0000000000000000000000000000000000000013"),
+		RemainderLocation:  common.HexToAddress("0x0000000000000000000000000000000000000014"),
 		ContractAddress:    common.HexToAddress("0xc46Cc53b8F09fe6F4eB6b6dF8AD5c6Fe5DA6638B"),
 	},
 	NodeType{
@@ -46,6 +52,9 @@ var NodeTypes = []NodeType{
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
                 RewardSplit:        big.NewInt(30), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000003"),
+		AddressLocation:    common.HexToAddress("0x0000000000000000000000000000000000000007"),
+		NodeCountLocation:  common.HexToAddress("0x0000000000000000000000000000000000000015"),
+		RemainderLocation:  common.HexToAddress("0x0000000000000000000000000000000000000016"),
 		ContractAddress:    common.HexToAddress("0xE44389C26FDEb581dEa7Df91Efd0665a7cd404c1"),
 	},
 	NodeType{
@@ -54,6 +63,9 @@ var NodeTypes = []NodeType{
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
                 RewardSplit:        big.NewInt(40), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000004"),
+		AddressLocation:    common.HexToAddress("0x0000000000000000000000000000000000000008"),
+		NodeCountLocation:  common.HexToAddress("0x0000000000000000000000000000000000000017"),
+		RemainderLocation:  common.HexToAddress("0x0000000000000000000000000000000000000018"),
 		ContractAddress:    common.HexToAddress("0x93B7a5c74793DCba765a1dD163e1744622306651"),
 	},
 }
@@ -207,6 +219,9 @@ type NodeType struct {
 	BlockReward        *big.Int
 	RewardSplit        *big.Int
 	RemainderAddress   common.Address
+        AddressLocation    common.Address
+        NodeCountLocation  common.Address
+        RemainderLocation  common.Address
 	ContractAddress    common.Address
 }
 

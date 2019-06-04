@@ -83,9 +83,6 @@ type Header struct {
 	Extra            []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest        common.Hash    `json:"mixHash"`
 	Nonce            BlockNonce     `json:"nonce"`
-	VerifiedNodeData []common.Address  `json:"verifiedNodeData"`
-	FailedNodeData   []common.Address  `json:"failedNodeData"`
-        NodeCounts       []uint64       `json:"nodeCounts"`
 }
 
 // field type overrides for gencodec
@@ -236,18 +233,6 @@ func CopyHeader(h *Header) *Header {
 		cpy.Extra = make([]byte, len(h.Extra))
 		copy(cpy.Extra, h.Extra)
 	}
-	if len(h.VerifiedNodeData) > 0 {
-		cpy.VerifiedNodeData = make([]common.Address, len(h.VerifiedNodeData))
-		copy(cpy.VerifiedNodeData, h.VerifiedNodeData)
-	}
-	if len(h.FailedNodeData) > 0 {
-		cpy.FailedNodeData = make([]common.Address, len(h.FailedNodeData))
-		copy(cpy.FailedNodeData, h.FailedNodeData)
-	}
-        if len(h.NodeCounts) > 0 {
-                cpy.NodeCounts = make([]uint64, len(h.NodeCounts))
-                copy(cpy.NodeCounts, h.NodeCounts)
-        }
 	return &cpy
 }
 

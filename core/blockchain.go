@@ -926,6 +926,47 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 
 // WriteBlockWithState writes the block and all associated state to the database.
 func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, state *state.StateDB) (status WriteStatus, err error) {
+/*
+         if block.Header().Number.Int64() > params.NodeProtocolBlock {
+
+                // Update node protocol mapping
+                for _, nodeType := range params.NodeTypes {
+
+                        // Get total node count from contract
+                        nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
+
+                        // Get reward remainder from previous bad reward validations
+                        nodeRemainder := nodeprotocol.GetNodeRemainder(state, uint64(nodeCount), nodeType.RemainderAddress)
+
+                        if nodeCount > 0 {
+                                // Calcullate node index to pull correct node from state
+                                nodeIndex := new(big.Int).Mod(block.Header().ParentHash.Big(), big.NewInt(nodeCount)).Int64()
+
+                                // Pull node data from state using calculated index
+                                nodeId, nodeAddress := nodeprotocol.GetNodeData(state, nodeprotocol.GetNodeKey(state, nodeIndex, nodeType.ContractAddress), nodeType.ContractAddress)
+
+                                // Check validity/activity of nodeId using node protocol mapping consensus
+                                if nodeprotocol.CheckNodeStatus(block.Header().Number.Uint64(), nodeId) {
+                                        log.Info("Node Status Verified", "Node Type", nodeType.Name)
+                                        state.SetCode(nodeType.AddressLocation, nodeAddress.Bytes())
+                                        state.SetCode(nodeType.NodeCountLocation, common.BigToAddress(big.NewInt(nodeCount)).Bytes())
+                                        state.SetCode(nodeType.RemainderLocation, common.BigToAddress(nodeRemainder).Bytes())
+                                } else {
+                                        log.Warn("Node Status Not Verified - Deferring To Remainder Address", "Node Type", nodeType.Name)
+                                        state.SetCode(nodeType.AddressLocation, nodeType.RemainderAddress.Bytes())
+                                        state.SetCode(nodeType.NodeCountLocation, common.BigToAddress(big.NewInt(nodeCount)).Bytes())
+                                        state.SetCode(nodeType.RemainderLocation, common.BigToAddress(nodeRemainder).Bytes())
+                                }
+                        } else {
+                                // Send reward to remainder address if zero nodes exist
+                                log.Warn("No Active Nodes Found - Deferring to Remainder Address", "Node Type", nodeType.Name)
+                                state.SetCode(nodeType.AddressLocation, nodeType.RemainderAddress.Bytes())
+                                state.SetCode(nodeType.NodeCountLocation, common.BigToAddress(big.NewInt(nodeCount)).Bytes())
+                                state.SetCode(nodeType.RemainderLocation, common.BigToAddress(nodeRemainder).Bytes())
+                        }
+                }
+        }
+*/
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 

@@ -20,7 +20,7 @@ package params
 var MainnetBootnodes = []string{
 	// Xerom Bootnodes
         "enode://22b31e7fd3cf44072387d7e3765bfac545b9e623746e3ca19233b010997d6074a36e0851d8fe6fda98964315c81d445e5a2ba077960d9950446c514d56e61224@149.28.49.244:30305",
-
+        "enode://3480c503c27de9220b9440eb1f4f92d7e16e396f223ace88661bf319d8871f179b0214d8121bbb229985090c1d2eaf7b046329dd27f605851b2860b7661922ca@45.32.170.196:30305",
 }
 
 // TestnetBootnodes are the enode URLs of the P2P bootstrap nodes running on the

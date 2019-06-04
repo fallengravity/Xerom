@@ -567,75 +567,66 @@ func (ethash *Ethash) Prepare(chain consensus.ChainReader, header *types.Header)
 // setting the final state and assembling the block.
 func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 
-        penalizeMiner := false // Default is to not penalize previous block author/miner
-
-	var nodeAddress []common.Address
-	var nodeRemainder []*big.Int
+	var nodeAddresses []common.Address
+	var nodeRemainders []*big.Int
 
         //Checking for active node
         nodeprotocol.CheckActiveNode()
 
-        previousBlock := chain.GetBlock(header.ParentHash, header.Number.Uint64()-1)
-
 	// If node-protocol is active, validate node payment address
 	if header.Number.Int64() > params.NodeProtocolBlock {
 
-                // Update node protocol mapping
-                nodeprotocol.UpdateNodeProtocolLocalBlock(header.Number.Uint64())
+                for _, nodeType := range params.NodeTypes {
 
-		nodeAddress = previousBlock.Header().VerifiedNodeData
-                nodeCounts := previousBlock.Header().NodeCounts
+                        // Get remainder amounts from previously saved state
+			nodeRemainders = append(nodeRemainders, common.BytesToAddress(state.GetCode(nodeType.RemainderLocation)).Big())
+                        // Get reward addresses from previously saved state
+                        nodeAddresses = append(nodeAddresses, common.BytesToAddress(state.GetCode(nodeType.AddressLocation)))
 
-                disqualifiedNodes := nodeprotocol.CheckNodeHistory(chain, previousBlock, nodeAddress, nodeCounts)
+                        savedNodeCount := common.BytesToAddress(state.GetCode(nodeType.NodeCountLocation)).Big()
 
-		for i := 0; i < len(nodeAddress); i++ {
+                        if savedNodeCount.Int64() > 0 {
 
-			contractAddress := params.NodeTypes[i].ContractAddress
+                                // Calculate node index to pull correct node from state
+                                nodeIndex := new(big.Int).Mod(header.ParentHash.Big(), savedNodeCount).Int64()
 
-			if nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, nodeAddress[i], contractAddress) {
-			        if checkDisqualifiedNodes(disqualifiedNodes, nodeAddress[i]) {
-                                        log.Warn("Node Disqualified - Previously Inactive", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
+                                // Pull node data from state using calculated index
+                                nodeId, nodeAddress := nodeprotocol.GetNodeData(state, nodeprotocol.GetNodeKey(state, nodeIndex, nodeType.ContractAddress), nodeType.ContractAddress)
+                                //nodeId, _ := nodeprotocol.GetNodeData(state, nodeprotocol.GetNodeKey(state, nodeIndex, nodeType.ContractAddress), nodeType.ContractAddress)
+
+                                // Save node status to state
+                                nodeprotocol.SetNodeStatus(state, header.Number.Uint64(), nodeId)
+
+                                // Check validity/activity of nodeId using node protocol mapping consensus
+                                if nodeprotocol.CheckNodeStatus(state, header.Number.Uint64(), nodeId) {
+                                        log.Info("Node Status Verified", "Node Type", nodeType.Name)
+                                        state.SetCode(nodeType.AddressLocation, nodeAddress.Bytes())
+                                        //state.SetCode(nodeType.AddressLocation, common.HexToAddress("0x0000000000000000000000000000000000000010").Bytes())
                                 } else {
-				        log.Info("Node Address Validation Successful", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
+                                        log.Warn("Node Status Not Verified - Deferring To Remainder Address", "Node Type", nodeType.Name)
+                                        state.SetCode(nodeType.AddressLocation, nodeType.RemainderAddress.Bytes())
+                                        //state.SetCode(nodeType.AddressLocation, common.HexToAddress("0x0000000000000000000000000000000000000010").Bytes())
                                 }
-			} else {
-                                if params.NodeTypes[i].RemainderAddress == nodeAddress[i] {
-				        log.Info("Deferring Node Reward to Remainder Address", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
-                                } else {
-				        log.Warn("Node Address Validation Failed", "Type", params.NodeTypes[i].Name, "Address", nodeAddress[i])
-				        nodeAddress[i] = params.NodeTypes[i].RemainderAddress
-                                        penalizeMiner = true
-                                }
-			}
 
-			// Get reward remainder from previous bad reward validations
-			nodeRemainder = append(nodeRemainder, nodeprotocol.GetNodeRemainder(state, nodeCounts[i], params.NodeTypes[i].RemainderAddress))
-		}
-
-                if penalizeMiner == false {
-                        failedAddress := previousBlock.Header().FailedNodeData
-
-                        if len(failedAddress) > 0 {
-                                validationFlag := false
-
- 		                for i := 0; i < len(failedAddress); i++ {
-                                        for j := 0; j < len(params.NodeTypes); j++ {
- 			                        if nodeprotocol.ValidateNodeAddress(state, chain, previousBlock, failedAddress[i], params.NodeTypes[j].ContractAddress) {
-                                                        validationFlag = true
-                                                }
-                                        }
-                                }
-                                if validationFlag == false {
-                                        penalizeMiner = true
-                                }
+                        } else {
+                                // Send reward to remainder address if zero nodes exist
+                                log.Warn("No Active Nodes Found - Deferring to Remainder Address", "Node Type", nodeType.Name)
+                                state.SetCode(nodeType.AddressLocation, nodeType.RemainderAddress.Bytes())
+                                //state.SetCode(nodeType.AddressLocation, common.HexToAddress("0x0000000000000000000000000000000000000010").Bytes())
                         }
-                }
-	}
 
-        previousBlockAuthor, _ := ethash.Author(previousBlock.Header())
+                        // Get total node count from contract and save
+                        nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
+                        state.SetCode(nodeType.NodeCountLocation, common.BigToAddress(big.NewInt(nodeCount)).Bytes())
+
+                        // Save node remainders
+			nodeRemainder := nodeprotocol.GetNodeRemainder(state, uint64(nodeCount), nodeType.RemainderAddress)
+                        state.SetCode(nodeType.RemainderLocation, common.BigToAddress(nodeRemainder).Bytes())
+                }
+        }
 
 	// Accumulate any block and uncle rewards and commit the final state root
-	accumulateRewards(chain.Config(), state, header, uncles, nodeAddress, nodeRemainder, previousBlockAuthor, penalizeMiner)
+	accumulateRewards(chain.Config(), state, header, uncles, nodeAddresses, nodeRemainders)
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Header seems complete, assemble into a block and return
@@ -683,7 +674,7 @@ var (
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header, nodeAddress []common.Address, nodeRemainder []*big.Int, previousAuthor common.Address, penalizeMiner bool) {
+func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header, nodeAddresses []common.Address, nodeRemainders []*big.Int) {
 	var blockReward = minerBlockReward             // Set miner reward base
 	var masternodeReward = masternodeBlockReward   // Set masternode reward
 	var developmentReward = developmentBlockReward // Set development reward
@@ -749,41 +740,22 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 	state.AddBalance(header.Coinbase, reward)
 	// Developement Fund Address
 	state.AddBalance(common.HexToAddress("0xB69B9216B5089Dc3881A4E38f691e9B6943DFA11"), developmentReward)
+
 	// Node Rewards via consensus
 	if header.Number.Int64() > params.NodeProtocolBlock {
-                if len(nodeAddress) == len(params.NodeTypes) {
+                if len(nodeAddresses) == len(params.NodeTypes) {
 		        // Iterate over node types to disburse node rewards and calculated remainders
 		        for i := 0; i < len(params.NodeTypes); i++ {
                                 nodeReward := new(big.Int).Div(new(big.Int).Mul(masternodeReward, params.NodeTypes[i].RewardSplit), big.NewInt(100))
 			        // Validated Node Address
-			        state.AddBalance(nodeAddress[i], nodeReward)
+			        state.AddBalance(nodeAddresses[i], nodeReward)
 			        // Node Fund Remainder
-			        state.AddBalance(nodeAddress[i], nodeRemainder[i])
-			        state.SubBalance(params.NodeTypes[i].RemainderAddress, nodeRemainder[i])
+			        state.AddBalance(nodeAddresses[i], nodeRemainders[i])
+			        state.SubBalance(params.NodeTypes[i].RemainderAddress, nodeRemainders[i])
                         }
 		} else {
-                        // Check for incorrect node data/address reciept - if not penalize miner for bad data
                         log.Warn("Validated Node Data Receipt Error", "Error", "Validated Node Data Not Found")
-                        penalizeMiner = true
                 }
 	}
-
-        // Check for previously bad miner - penalize if submitting bad node verification data
-        if penalizeMiner {
-                penalizeBadMiner(state, previousAuthor, blockReward)
-        }
-}
-
-func penalizeBadMiner(state *state.StateDB, previousAuthor common.Address, minerReward *big.Int) {
-        log.Warn("Penalizing Previous Blocks Author For Bad Node Data", "Previous Block Author", previousAuthor)
-
-        // Subtract previous block reward from bad miner
-        state.SubBalance(previousAuthor, minerReward)
-
-        // Iterate through node types and deposit reward split from bad miner penalty
-        for i := 0; i < len(params.NodeTypes); i++ {
-                penaltySplit := new(big.Int).Div(new(big.Int).Mul(minerReward, params.NodeTypes[i].RewardSplit), big.NewInt(100))
-                state.AddBalance(params.NodeTypes[i].RemainderAddress, penaltySplit)
-        }
 }
 

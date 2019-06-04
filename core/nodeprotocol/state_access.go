@@ -96,21 +96,17 @@ func GetNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 	finalNodeIdLocation4 := common.BigToHash(new(big.Int).Add(finalNodeIdLocation1.Big(), big.NewInt(3)))
 
 	nodeAddressLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(1)))
-	nodeIpLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(3)))
-	nodePortLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(4)))
 
 	// Get storage state form db using the hashed data
 	responseNodeId1 := state.GetState(contractAddress, finalNodeIdLocation1)
 	responseNodeId2 := state.GetState(contractAddress, finalNodeIdLocation2)
 	responseNodeId3 := state.GetState(contractAddress, finalNodeIdLocation3)
 	responseNodeId4 := state.GetState(contractAddress, finalNodeIdLocation4)
-	responseNodeIp := state.GetState(contractAddress, nodeIpLocation)
-	responseNodePort := state.GetState(contractAddress, nodePortLocation)
 	responseNodeAddress := state.GetState(contractAddress, nodeAddressLocation)
 
 	// Assemble the strings
-	contractNodeIdString := "enode://" + stripCtlAndExtFromBytes(string(responseNodeId1.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId2.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId3.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId4.Bytes())) + "@" + stripCtlAndExtFromBytes(string(responseNodeIp.Bytes())) + ":" + stripCtlAndExtFromBytes(string(responseNodePort.Bytes()))
+        contractNodeId := stripCtlAndExtFromBytes(string(responseNodeId1.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId2.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId3.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId4.Bytes()))
 	contractNodeAddress := common.BytesToAddress(responseNodeAddress.Bytes())
 
-	return contractNodeIdString, contractNodeAddress
+	return contractNodeId, contractNodeAddress
 }

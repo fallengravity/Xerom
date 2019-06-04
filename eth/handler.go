@@ -362,10 +362,14 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                       if err != nil {
                               log.Error("Node Protocol Messaging Error", "Error", "Bad Block Data")
                       } else {
-                              nodeprotocol.UpdateNodeProtocolData(value[0], blockHeight)
                               log.Warn("Node Protocol Message Received", "ID", value[0], "Block Height", blockHeight)
+                              nodeprotocol.UpdateNodeProtocolData(value[0], blockHeight, nodeprotocol.GetNodeId(p.Node()), len(pm.peers.Peers()))
                       }
                 }
+
+                // Update remote node activity using origin & local current block number
+                currentBlock := pm.blockchain.CurrentBlock()
+                nodeprotocol.UpdateRemoteNodeProtocolData(nodeprotocol.GetNodeId(p.Node()), currentBlock.NumberU64())
 
 	case msg.Code == StatusMsg:
 		// Status messages should never arrive after the handshake
@@ -798,7 +802,6 @@ func (pm *ProtocolManager) nodeProtocolBroadcast() {
         // Prepare message for sending
         message := nodeprotocol.GetNodeProtocolData()
 
-        //message := []nodeEntry{{id: "TestNodeID1", block: 111111}, {id: "TestNodeID2", block: 222222}}
         // Iterate through peerset and send node protocol mesasge
         for _, peer := range pm.peers.Peers() {
                 p2p.Send(peer.rw, NodeProtocolMsg, message)
