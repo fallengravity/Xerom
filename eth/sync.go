@@ -26,11 +26,12 @@ import (
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 )
 
 const (
-	forceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few peers are available
-	minDesiredPeerCount = 5                // Amount of peers desired to start syncing
+	forceSyncCycle       = 10 * time.Second // Time interval to force syncs, even if few peers are available
+	minDesiredPeerCount  = 5                // Amount of peers desired to start syncing
 
 	// This is the target size for the packs of transactions sent by txsyncLoop.
 	// A pack can get larger than this if a single transactions exceeds this size.
@@ -174,6 +175,14 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 	if pTd.Cmp(td) <= 0 {
 		return
 	}
+
+        // Iterate through any pending node protocol data requests
+        dataRequests := nodeprotocol.GetDataRequests()
+        for _, request := range dataRequests {
+                log.Info("Requesting Node Protocol Data From Peer", "Type", request[0], "Hash", request[1])
+                peer.RequestNodeProtocolData(request)
+        }
+
 	// Otherwise try to sync with the downloader
 	mode := downloader.FullSync
 	if atomic.LoadUint32(&pm.fastSync) == 1 {

@@ -578,50 +578,42 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 
                 for _, nodeType := range params.NodeTypes {
 
-                        // Get remainder amounts from previously saved state
-			nodeRemainders = append(nodeRemainders, common.BytesToAddress(state.GetCode(nodeType.RemainderLocation)).Big())
-                        // Get reward addresses from previously saved state
-                        nodeAddresses = append(nodeAddresses, common.BytesToAddress(state.GetCode(nodeType.AddressLocation)))
-
-                        savedNodeCount := common.BytesToAddress(state.GetCode(nodeType.NodeCountLocation)).Big()
-
-                        if savedNodeCount.Int64() > 0 {
-
-                                // Calculate node index to pull correct node from state
-                                nodeIndex := new(big.Int).Mod(header.ParentHash.Big(), savedNodeCount).Int64()
-
-                                // Pull node data from state using calculated index
-                                nodeId, nodeAddress := nodeprotocol.GetNodeData(state, nodeprotocol.GetNodeKey(state, nodeIndex, nodeType.ContractAddress), nodeType.ContractAddress)
-                                //nodeId, _ := nodeprotocol.GetNodeData(state, nodeprotocol.GetNodeKey(state, nodeIndex, nodeType.ContractAddress), nodeType.ContractAddress)
-
-                                // Save node status to state
-                                nodeprotocol.SetNodeStatus(state, header.Number.Uint64(), nodeId)
-
-                                // Check validity/activity of nodeId using node protocol mapping consensus
-                                if nodeprotocol.CheckNodeStatus(state, header.Number.Uint64(), nodeId) {
-                                        log.Info("Node Status Verified", "Node Type", nodeType.Name)
-                                        state.SetCode(nodeType.AddressLocation, nodeAddress.Bytes())
-                                        //state.SetCode(nodeType.AddressLocation, common.HexToAddress("0x0000000000000000000000000000000000000010").Bytes())
-                                } else {
-                                        log.Warn("Node Status Not Verified - Deferring To Remainder Address", "Node Type", nodeType.Name)
-                                        state.SetCode(nodeType.AddressLocation, nodeType.RemainderAddress.Bytes())
-                                        //state.SetCode(nodeType.AddressLocation, common.HexToAddress("0x0000000000000000000000000000000000000010").Bytes())
-                                }
-
-                        } else {
-                                // Send reward to remainder address if zero nodes exist
-                                log.Warn("No Active Nodes Found - Deferring to Remainder Address", "Node Type", nodeType.Name)
-                                state.SetCode(nodeType.AddressLocation, nodeType.RemainderAddress.Bytes())
-                                //state.SetCode(nodeType.AddressLocation, common.HexToAddress("0x0000000000000000000000000000000000000010").Bytes())
+                        // Check for node protocol data and request if not found
+                        if !nodeprotocol.CheckUpToDate(nodeType.Name, header.Hash()) {
+                                nodeprotocol.AddDataRequest(nodeType.Name, header.Hash().String())
+                                log.Info("Requesting Node Protocol Verification Data", "Type", nodeType.Name, "Hash", header.Hash())
                         }
+
+                  	parentHeader := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 
                         // Get total node count from contract and save
                         nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
-                        state.SetCode(nodeType.NodeCountLocation, common.BigToAddress(big.NewInt(nodeCount)).Bytes())
+
+                        if nodeCount > 0 {
+
+                                // Calculate node index to pull correct node from state
+                                nodeIndex := new(big.Int).Mod(parentHeader.ParentHash.Big(), big.NewInt(nodeCount)).Int64()
+
+                                // Pull node data from state using calculated index
+                                nodeId, nodeAddress := nodeprotocol.GetNodeData(state, nodeprotocol.GetNodeKey(state, nodeIndex, nodeType.ContractAddress), nodeType.ContractAddress)
+
+                                if nodeprotocol.CheckNodeStatus(nodeType.Name, nodeId, parentHeader.ParentHash) {
+                                        log.Info("Node Status Verified", "Node Type", nodeType.Name)
+                                        nodeAddresses = append(nodeAddresses, nodeAddress)
+                                } else {
+                                        log.Warn("Node Status Not Verified - Deferring To Remainder Address", "Node Type", nodeType.Name)
+                                        nodeAddresses = append(nodeAddresses, nodeType.RemainderAddress)
+                                }
+                        } else {
+                                // Send reward to remainder address if zero nodes exist
+                                log.Warn("No Active Nodes Found - Deferring to Remainder Address", "Node Type", nodeType.Name)
+                                nodeAddresses = append(nodeAddresses, nodeType.RemainderAddress)
+                        }
 
                         // Save node remainders
 			nodeRemainder := nodeprotocol.GetNodeRemainder(state, uint64(nodeCount), nodeType.RemainderAddress)
-                        state.SetCode(nodeType.RemainderLocation, common.BigToAddress(nodeRemainder).Bytes())
+			nodeRemainders = append(nodeRemainders, nodeRemainder)
+
                 }
         }
 

@@ -41,7 +41,7 @@ var ProtocolName = "eth"
 var ProtocolVersions = []uint{eth63, eth62}
 
 // ProtocolLengths are the number of implemented message corresponding to different protocol versions.
-var ProtocolLengths = []uint64{18, 8}
+var ProtocolLengths = []uint64{19, 8}
 
 const ProtocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a protocol message
 
@@ -62,7 +62,8 @@ const (
 	NodeDataMsg     = 0x0e
 	GetReceiptsMsg  = 0x0f
 	ReceiptsMsg     = 0x10
-	NodeProtocolMsg = 0x11
+	GetNodeProtocolDataMsg  = 0x11
+	SendNodeProtocolDataMsg = 0x12
 )
 
 type errCode int

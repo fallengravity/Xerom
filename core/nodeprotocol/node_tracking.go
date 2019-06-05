@@ -22,24 +22,23 @@ import (
         "crypto/ecdsa"
         "net/url"
         "net"
+        "os/user"
+        "io/ioutil"
+        "encoding/hex"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/p2p/enode"
         "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enr"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 var activeNode *node.Node
-var nodeConsensusMap map[string]uint64
-var localNodeConsensusMap map[string]nodeConsensus
-
-type nodeConsensus struct {
-        blockHeight uint64
-	peerIdMap map[string]uint64
-}
+var nodeProtocolData map[string]map[common.Hash]string
+var EnodeId string
+var awaitingDataRequests map[string][]string
 
 func ActiveNode() *node.Node {
 	return activeNode
@@ -47,6 +46,97 @@ func ActiveNode() *node.Node {
 
 func SetActiveNode(stack *node.Node) {
 	activeNode = stack
+        setNodeId()
+        log.Info("Node Protocol Node ID Setup Confirmed", "ID", EnodeId)
+}
+
+// CheckNodeProtocolStatus determines if node protocol data has been initiated
+func CheckNodeProtocolStatus() bool {
+        if len(nodeProtocolData) > 0 {
+                return true
+        }
+        return false
+
+}
+
+// AddDataRequest adds requests for node activity data to queue
+func AddDataRequest(nodeType string, blockHash string) {
+        if len(awaitingDataRequests) == 0 {
+                awaitingDataRequests = make(map[string][]string)
+        }
+        awaitingDataRequests[nodeType + blockHash] = []string{nodeType, blockHash}
+}
+
+// GetDataRequests returns queued data requests and resets list
+func GetDataRequests() [][]string {
+        var dataRequests [][]string
+        for _, requests := range awaitingDataRequests {
+                dataRequests = append(dataRequests, requests)
+        }
+        awaitingDataRequests = make(map[string][]string)
+        return dataRequests
+}
+
+// SetupNodeProtocolMap initiates node protocol mapping
+func SetupNodeProtocolMapping() {
+        log.Info("Initializing Node Protocol Data Mapping")
+        nodeProtocolData = make(map[string]map[common.Hash]string)
+        for _, nodeType := range params.NodeTypes {
+                nodeProtocolData[nodeType.Name] = make(map[common.Hash]string)
+        }
+}
+
+// CheckNodeStatus checks to see if specified node has been validated
+func CheckNodeStatus(nodeType string, nodeId string, blockHash common.Hash) bool {
+        if len(nodeProtocolData) == 0 {
+                SetupNodeProtocolMapping()
+        }
+        if value, ok := nodeProtocolData[nodeType][blockHash]; ok {
+                if nodeId == value {
+                        log.Info("Node ID Found in Node Protocol Data", "Validated", "True", "Type", nodeType, "ID", nodeId)
+                        return true
+                }
+        }
+        log.Warn("Node ID Not Found in Node Protocol Data", "Validated", "False", "Type", nodeType, "ID", nodeId)
+        return false
+}
+
+// CheckUpToDate checks to see if blockHash has been recorderd in mapping
+func CheckUpToDate(nodeType string, blockHash common.Hash) bool {
+        if len(nodeProtocolData) == 0 {
+                SetupNodeProtocolMapping()
+        }
+        if _, ok := nodeProtocolData[nodeType][blockHash]; ok {
+                return true
+        }
+        return false
+}
+
+// GetNodeProtocolData returns the nodeid at specified blockHash of specific node type
+func GetNodeProtocolData(nodeType string, blockHash common.Hash) string {
+        if len(nodeProtocolData) == 0 {
+                SetupNodeProtocolMapping()
+        }
+        if nodeId, ok := nodeProtocolData[nodeType][blockHash]; ok {
+                log.Info("Node ID Found in Node Protocol Data", "Type", nodeType, "ID", nodeId, "Hash", blockHash)
+                return nodeId
+        }
+
+        log.Warn("Node ID Not Found in Node Protocol Data", "Type", nodeType, "Hash", blockHash)
+        return ""
+}
+
+// UpdateNodeProtocolDate updates protocol mapping data for verified nodes
+func UpdateNodeProtocolData(nodeType string, nodeId string, blockHash common.Hash) {
+        if len(nodeProtocolData) == 0 {
+                SetupNodeProtocolMapping()
+        }
+        if id, ok := nodeProtocolData[nodeType][blockHash]; ok {
+                log.Warn("Duplicate Node ID Data Found in Node Protocol Data", "Type", nodeType, "ID", id, "Hash", blockHash)
+        } else {
+                nodeProtocolData[nodeType][blockHash] = nodeId
+                log.Info("Node ID Saved To Node Protocol Data", "Type", nodeType, "ID", nodeId, "Hash", blockHash)
+        }
 }
 
 // GetNodeId return enodeid in string format from *enode.Node
@@ -79,125 +169,25 @@ func GetNodeId(n *enode.Node) string {
         return u.User.String()
 }
 
-// CheckNodeStatus checks the node protocol map and verifies the node is
-// active and not stale or invalid
-func CheckNodeStatus(state *state.StateDB, blockHeight uint64, nodeId string) bool {
-        nodeStatus := common.BytesToAddress(state.GetCode(common.HexToAddress(nodeId)))
-        compareStatus := common.BytesToAddress([]byte("TRUE"))
-        if nodeStatus == compareStatus {
-                log.Info("Retrieving Node Status From State", "Status", nodeStatus, "Confirmed", "True")
-                return true
-        } else {
-                log.Info("Retrieving Node Status From State", "Status", nodeStatus, "Confirmed", "False")
-        }
-        return false
+// Get user home directory from env
+func getHomeDirectory() string {
+    usr, err := user.Current()
+    if err != nil {
+        log.Error("Unable To Find Home Directory" )
+    }
+    return usr.HomeDir
 }
 
-// SetNodeStatus records node active status in statedb
-func SetNodeStatus(state *state.StateDB, blockHeight uint64, nodeId string) {
-        if len(nodeConsensusMap) == 0 {
-                SetupNodeProtocolMapping()
-        }
-        if nodeBlockHeight, ok := nodeConsensusMap[nodeId]; ok {
-                // Only allow a state update is nodeBlockHeight has been confirmed by peers to be active
-                if nodeBlockHeight > 0 {
-                        // Verifify that node is active within last 276 block (roughly an hour)
-                        if blockHeight < uint64(276) || nodeBlockHeight > (blockHeight - uint64(276)) {
-                                state.SetCode(common.HexToAddress(nodeId), []byte("TRUE"))
-                        } else {
-                                state.SetCode(common.HexToAddress(nodeId), []byte("FALSE"))
-                        }
-                }
-        }
-}
-
-// SetupNodeProtocolMap initiates node protocol mapping
-func SetupNodeProtocolMapping() {
-        log.Info("Initializing Node Protocol Data Mapping")
-        nodeConsensusMap = make(map[string]uint64)
-        localNodeConsensusMap = make(map[string]nodeConsensus)
-}
-
-// UpdateRemoteNodeProtocolData updates mapping data of the message sender
-// to latest block height
-func UpdateRemoteNodeProtocolData(peerId string, newBlockHeight uint64) {
-        if len(nodeConsensusMap) == 0 {
-                SetupNodeProtocolMapping()
-        }
-        // Check to see if node protocl mapping has been initiated
-        // then update known block height
-        if nodeConsensusStruct, ok := localNodeConsensusMap[peerId]; ok {
-                if newBlockHeight > nodeConsensusStruct.blockHeight {
-                        nodeConsensusStruct.blockHeight = newBlockHeight
-                        nodeConsensusStruct.peerIdMap = make(map[string]uint64)
-                        nodeConsensusMap[peerId] = newBlockHeight
-                }
-        } else {
-               var nodeConsensusData nodeConsensus
-               nodeConsensusData.blockHeight = newBlockHeight
-               nodeConsensusData.peerIdMap = make(map[string]uint64)
-               localNodeConsensusMap[peerId] = nodeConsensusData
-               nodeConsensusMap[peerId] = newBlockHeight
-        }
-}
-
-// UpdateNodeProtocolMap updates mapping data to latest block heights
-// based on node messaging that has been received on node protocol layer
-func UpdateNodeProtocolData(nodeId string, newBlockHeight uint64, peerId string, peerCount int) {
-        if len(nodeConsensusMap) == 0 {
-                SetupNodeProtocolMapping()
-        }
-        if nodeConsensusStruct, ok := localNodeConsensusMap[nodeId]; ok {
-                if newBlockHeight > nodeConsensusStruct.blockHeight {
-
-                        nodeConsensusStruct.peerIdMap[peerId] = newBlockHeight
-
-                        // Set peerCount comparison number
-                        peerCountComparison := 1
-                        if peerCount > 20 {
-                                peerCountComparison = peerCount / 2
-                        }
-
-                        // Update consensus mapping blockheight is enough peers confirm node as active
-                        // and clear peer mapping to start over
-                        if len(nodeConsensusStruct.peerIdMap) > peerCountComparison {
-                                updatedBlockHeight := GetMinMappingValue(nodeConsensusStruct.peerIdMap)
-                                nodeConsensusStruct.blockHeight = updatedBlockHeight
-                                nodeConsensusStruct.peerIdMap = make(map[string]uint64)
-                                nodeConsensusMap[nodeId] = updatedBlockHeight
-                        } else {
-                              nodeConsensusStruct.peerIdMap[peerId] = newBlockHeight
-                        }
-                        localNodeConsensusMap[nodeId] = nodeConsensusStruct
-                }
-        } else {
-                var nodeConsensusData nodeConsensus
-                nodeConsensusData.blockHeight = 0
-                nodeConsensusData.peerIdMap = make(map[string]uint64)
-                nodeConsensusData.peerIdMap[peerId] = newBlockHeight
-                localNodeConsensusMap[nodeId] = nodeConsensusData
-                nodeConsensusMap[nodeId] = 0
-        }
-}
-
-// GetMinMappingValue min value from node protocol mapping data
-func GetMinMappingValue(peerIdMap map[string]uint64) uint64 {
-        minMappingValue := uint64(0)
-        for _, value := range peerIdMap {
-                if minMappingValue == 0 {
-                        minMappingValue = value
-                } else if value < minMappingValue {
-                        minMappingValue = value
-                }
-        }
-        return minMappingValue
-}
-
-// GetNodeProtocolMap returns node protocol mapping data
-func GetNodeProtocolData() [][]string {
-        var nodeConsensusData [][]string
-        for nodeId, blockHeight := range nodeConsensusMap {
-                nodeConsensusData = append(nodeConsensusData, []string{nodeId, strconv.FormatUint(blockHeight, 10)})
-        }
-        return nodeConsensusData
+// Retrieve nodekey and calculate enodeid
+func setNodeId() {
+    b, err := ioutil.ReadFile(getHomeDirectory() + "/.xerom/geth/nodekey")
+    if err != nil {
+        fmt.Print(err)
+    }
+    enodeId, err := crypto.HexToECDSA(string(b))
+    if err != nil {
+        fmt.Print(err)
+    }
+    pubkeyBytes := crypto.FromECDSAPub(&enodeId.PublicKey)[1:]
+    EnodeId = hex.EncodeToString(pubkeyBytes)
 }
