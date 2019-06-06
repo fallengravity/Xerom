@@ -584,6 +584,11 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
                                 log.Info("Requesting Node Protocol Verification Data", "Type", nodeType.Name, "Hash", header.Hash())
                         }
 
+                        if !nodeprotocol.CheckUpToDate(nodeType.Name, header.ParentHash) {
+                                nodeprotocol.AddDataRequest(nodeType.Name, header.ParentHash.String())
+                                log.Info("Requesting Node Protocol Verification Data", "Type", nodeType.Name, "Hash", header.ParentHash)
+                        }
+
                   	parentHeader := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 
                         // Get total node count from contract and save
