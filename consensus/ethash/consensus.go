@@ -576,33 +576,24 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 	// If node-protocol is active, validate node payment address
 	if header.Number.Int64() > params.NodeProtocolBlock {
 
+                parent := chain.GetBlock(header.ParentHash, header.Number.Uint64()-1)
+                grandParent := chain.GetBlock(parent.Header().ParentHash, parent.NumberU64()-1)
+
                 for _, nodeType := range params.NodeTypes {
-
-                        // Check for node protocol data and request if not found
-                        if !nodeprotocol.CheckUpToDate(nodeType.Name, header.Hash()) {
-                                nodeprotocol.AddDataRequest(nodeType.Name, header.Hash().String())
-                                log.Info("Requesting Node Protocol Verification Data", "Type", nodeType.Name, "Hash", header.Hash())
-                        }
-
-                        if !nodeprotocol.CheckUpToDate(nodeType.Name, header.ParentHash) {
-                                nodeprotocol.AddDataRequest(nodeType.Name, header.ParentHash.String())
-                                log.Info("Requesting Node Protocol Verification Data", "Type", nodeType.Name, "Hash", header.ParentHash)
-                        }
-
-                  	parentHeader := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 
                         // Get total node count from contract and save
                         nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
 
                         if nodeCount > 0 {
 
-                                // Calculate node index to pull correct node from state
-                                nodeIndex := new(big.Int).Mod(parentHeader.ParentHash.Big(), big.NewInt(nodeCount)).Int64()
+                                // Determine next reward candidate
+                                nodeId, nodeAddress := nodeprotocol.GetNodeCandidate(state, grandParent.Header().ParentHash, nodeCount, nodeType.ContractAddress)
 
-                                // Pull node data from state using calculated index
-                                nodeId, nodeAddress := nodeprotocol.GetNodeData(state, nodeprotocol.GetNodeKey(state, nodeIndex, nodeType.ContractAddress), nodeType.ContractAddress)
-
-                                if nodeprotocol.CheckNodeStatus(nodeType.Name, nodeId, parentHeader.ParentHash) {
+                                /*if nodeprotocol.CheckUpToDate(nodeType.Name, grandParent.Header().ParentHash) {
+                                        state.SetCode(common.BytesToAddress(append([]byte(nodeType.Name), grandParent.Header().ParentHash.Bytes()...)), []byte(nodeId))
+                                }*/
+                                if nodeprotocol.CheckNodeStatus(header.Number.Uint64(), header.Hash(), parent.Hash(), parent.ParentHash(), nodeType.Name, nodeId, grandParent.Header().ParentHash) {
+                                //if common.BytesToAddress(state.GetCode(common.BytesToAddress(append([]byte(nodeType.Name), grandParent.Header().ParentHash.Bytes()...)))) == common.BytesToAddress([]byte(nodeId)) {
                                         log.Info("Node Status Verified", "Node Type", nodeType.Name)
                                         nodeAddresses = append(nodeAddresses, nodeAddress)
                                 } else {
@@ -616,8 +607,8 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
                         }
 
                         // Save node remainders
-			nodeRemainder := nodeprotocol.GetNodeRemainder(state, uint64(nodeCount), nodeType.RemainderAddress)
-			nodeRemainders = append(nodeRemainders, nodeRemainder)
+		        nodeRemainder := nodeprotocol.GetNodeRemainder(state, uint64(nodeCount), nodeType.RemainderAddress)
+		        nodeRemainders = append(nodeRemainders, nodeRemainder)
 
                 }
         }

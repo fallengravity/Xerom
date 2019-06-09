@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -338,6 +339,19 @@ func (d *Downloader) Synchronise(id string, head common.Hash, td *big.Int, mode 
 			log.Warn("Downloader wants to drop peer, but peerdrop-function is not set", "peer", id)
 		} else {
 			d.dropPeer(id)
+
+                        // Reset & resync node protocol data
+                        log.Warn("Resetting & Resyncing  Node Protocol Data")
+                        nodeprotocol.ResetNodeProtocolData()
+                        /*for _, nodeType := range params.NodeTypes {
+                                log.Warn("Resetting & Resyncing  Node Protocol Data From Peer", "Type", nodeType.Name)
+                                data := nodeType.Name
+                                for _, peer := range d.peers.peers {
+                                //peer := d.peers.peers.peer.BestPeer()
+                                        peer.peer.RequestNodeProtocolSyncData(data)
+                                }
+                        }*/
+
 		}
 	default:
 		log.Warn("Synchronisation failed, retrying", "err", err)

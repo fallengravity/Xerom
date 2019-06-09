@@ -192,6 +192,9 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 	}
 	manager.fetcher = fetcher.New(blockchain.GetBlockByHash, validator, manager.BroadcastBlock, heighter, inserter, manager.removePeer)
 
+        // Export chain service for node protocol use
+        //nodeprotocol.UpdateBlockChainService(manager.blockchain)
+
 	return manager, nil
 }
 
@@ -350,6 +353,25 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	// Handle the message depending on its contents
 	switch {
 
+	case msg.Code == GetNodeProtocolSyncDataMsg:
+                var nodeProtocolData string
+                if err := msg.Decode(&nodeProtocolData); err != nil {
+                        return errResp(ErrDecode, "msg %v: %v", msg, err)
+                }
+                var data = [][]string{[]string{nodeProtocolData}, nodeprotocol.GetNodeProtocolSyncNodeData(nodeProtocolData), nodeprotocol.GetNodeProtocolSyncHashData(nodeProtocolData)}
+                p.SendNodeProtocolSyncData(data)
+
+	case msg.Code == SendNodeProtocolSyncDataMsg:
+                var nodeProtocolData [][]string
+                if err := msg.Decode(&nodeProtocolData); err != nil {
+                        return errResp(ErrDecode, "msg %v: %v", msg, err)
+                }
+                if len(nodeProtocolData) != 3 {
+                        log.Error("Incorrectly Formatted Node Data Sync Message Received")
+                } else {
+                        nodeprotocol.SyncNodeProtocolData(nodeProtocolData[0][0], nodeProtocolData[1], nodeProtocolData[2])
+                }
+
 	case msg.Code == GetNodeProtocolDataMsg:
 
                 var nodeProtocolData []string
@@ -360,14 +382,51 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                 // Check if we have updated node protocol data
                 if nodeprotocol.CheckUpToDate(nodeProtocolData[0], common.HexToHash(nodeProtocolData[1])) {
                         var data = []string{nodeProtocolData[0], nodeprotocol.GetNodeProtocolData(nodeProtocolData[0], common.HexToHash(nodeProtocolData[1])), nodeProtocolData[1]}
-                        return p.SendNodeProtocolData(data)
+                        //go pm.AsyncSendNodeProtocolData(data)
+                        p.SendNodeProtocolData(data)
                 }
+/*                } else {
+
+                        var nodeType params.NodeType
+                        for _, nodeTypes := range params.NodeTypes {
+                                if nodeTypes.Name == nodeProtocolData[0] {
+                                        nodeType = nodeTypes
+                                }
+                        }
+                        // Get current state snapshot
+                        block := pm.blockchain.GetBlockByHash(common.HexToHash(nodeProtocolData[1]))
+                        if block != nil && nodeType != (params.NodeType{}) {
+                                state, err := pm.blockchain.StateAt(block.Root())
+
+                                if err == nil {
+                                        nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
+
+                                        if nodeCount > 0 {
+                                                // Calculate node index to pull correct node from state
+                                                nodeIndex := new(big.Int).Mod(block.Hash().Big(), big.NewInt(nodeCount)).Int64()
+                                                nodeId, _ := nodeprotocol.GetNodeData(state, nodeprotocol.GetNodeKey(state, nodeIndex, nodeType.ContractAddress), nodeType.ContractAddress)
+
+                                                if nodeId == nodeprotocol.EnodeId {
+                                                        log.Info("Requested Node ID Match - Sending Evidence of Local Node Activity", "Type", nodeType.Name, "Local ID", nodeprotocol.EnodeId, "Matching State ID", nodeId)
+                                                        var data = []string{nodeType.Name, nodeId, block.Hash().String()}
+                                                        nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, block.Hash())
+                                                        go pm.AsyncSendNodeProtocolData(data)
+                                                } else {
+                                                        //log.Info("Node ID Not Found - Requesting Node Activity Data", "Type", nodeType.Name, "Local ID", nodeprotocol.EnodeId, "Matching State ID", nodeId)
+                                                        var data = []string{nodeType.Name, block.Hash().String()}
+                                                        go pm.AsyncGetNodeProtocolData(data)
+                                                }
+                                        }
+                                }
+                        }
+                }*/
 
                 // If we dont have updated data request node protocol data
-                var data = []string{nodeProtocolData[0], nodeProtocolData[1]}
-                return p.RequestNodeProtocolData(data)
+                //var data = []string{nodeProtocolData[0], nodeProtocolData[1]}
+                //log.Trace("Valid Node Protocol Data Not Found - Requesting Data", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[1])
+                //go pm.AsyncGetNodeProtocolData(data)
 
-                case msg.Code == SendNodeProtocolDataMsg:
+        case msg.Code == SendNodeProtocolDataMsg:
 
                 var nodeProtocolData []string
 		if err := msg.Decode(&nodeProtocolData); err != nil {
@@ -375,15 +434,30 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
                 if len(nodeProtocolData) != 3 {
-                        log.Warn("Incorrectly Formatted Node Data Message Received")
-                } else {
+                        log.Error("Incorrectly Formatted Node Data Message Received")
+                } else if !nodeprotocol.IsLocked() && atomic.LoadUint32(&pm.acceptTxs) == 1 {
 
-                        // Check if we have updated node protocol data
-                        if !nodeprotocol.CheckUpToDate(nodeProtocolData[0], common.HexToHash(nodeProtocolData[2])) {
-                                nodeprotocol.UpdateNodeProtocolData(nodeProtocolData[0], nodeProtocolData[1], common.HexToHash(nodeProtocolData[2]))
-                                log.Warn("Node Protocol Message Received", "Type", nodeProtocolData[0], "ID", nodeProtocolData[1])
+                        //log.Info("Node Protocol Message Received", "Type", nodeProtocolData[0], "ID", nodeProtocolData[1], "Hash", common.HexToHash(nodeProtocolData[2]))
+                        //if atomic.LoadUint32(&pm.acceptTxs) == 1 {
+
+                        block := pm.blockchain.GetBlockByHash(common.HexToHash(nodeProtocolData[2]))
+                        if block == nil { return nil }
+                        currentBlock := pm.blockchain.CurrentBlock()
+                        if currentBlock == nil { return nil }
+                        parentBlock := pm.blockchain.GetBlockByHash(currentBlock.ParentHash())
+                        if parentBlock == nil { return nil }
+                        grandParentBlock := pm.blockchain.GetBlockByHash(parentBlock.ParentHash())
+                        if grandParentBlock == nil { return nil }
+                        // Only add a new node data if it is recent enough
+                        if block.NumberU64() > grandParentBlock.NumberU64() {
+                                // Check if we have updated node protocol data
+                                if !nodeprotocol.CheckUpToDate(nodeProtocolData[0], common.HexToHash(nodeProtocolData[2])) {
+                                        peerId := nodeprotocol.GetNodeId(p.Peer.Node())
+                                        nodeprotocol.UpdateNodeProtocolData(nodeProtocolData[0], nodeProtocolData[1], peerId, len(pm.peers.peers), common.HexToHash(nodeProtocolData[2]))
+                                        log.Info("Node Protocol Message Update Processed", "Type", nodeProtocolData[0], "ID", nodeProtocolData[1], "Hash", common.HexToHash(nodeProtocolData[2]))
+                                        go pm.AsyncSendNodeProtocolData(nodeProtocolData)
+                                }
                         }
-
                 }
 
 	case msg.Code == StatusMsg:
@@ -477,7 +551,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			}
 		}
 
-                // Check for node protocol data, if not found request it
+                /*// Check for node protocol data, if not found request it
                 for _, header := range headers {
 
                         for _, nodeType := range params.NodeTypes {
@@ -490,7 +564,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                                         p.RequestNodeProtocolData(data)
                                 }
                         }
-                }
+                }*/
 
 		return p.SendBlockHeaders(headers)
 
@@ -513,7 +587,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				p.Log().Warn("Dropping unsynced node during fast sync", "addr", p.RemoteAddr(), "type", p.Name())
 				return errors.New("unsynced node cannot serve fast sync")
 			}
-		} else {
+		}/* else {
                         for _, header := range headers {
 
                                 for _, nodeType := range params.NodeTypes {
@@ -527,7 +601,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                                         }
                                 }
                         }
-                }
+                }*/
 		// Filter out any explicitly requested headers, deliver the rest to the downloader
 		filter := len(headers) == 1
 		if filter {
@@ -732,7 +806,76 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		p.MarkBlock(request.Block.Hash())
 		pm.fetcher.Enqueue(p.id, request.Block)
 
-                for _, nodeType := range params.NodeTypes {
+                // Check for next node up for reward
+                //block := request.Block
+                block := pm.blockchain.CurrentBlock()
+
+                if nodeprotocol.NodeFlag && block.Header().Number.Int64() > params.NodeProtocolBlock{
+
+                        //var isSyncing bool
+                        //isSyncing = pm.blockchain.CurrentFastBlock().NumberU64() == block.NumberU64()
+
+                        //if !isSyncing {
+                        //_, td := p.Head()
+                        //currentTd := pm.blockchain.GetTd(block.Header().Hash(), block.Header().Number.Uint64())
+                        //if td != nil && currentTd != nil {
+                        //if td.Cmp(currentTd) >= 0 {
+                        //if pm.blockchain.GetTd(block.Hash(), block.NumberU64()).Cmp(p.td) != -1 {
+                        //if atomic.LoadUint32(&pm.acceptTxs) == 1 {
+                        //        log.Info("Chain is Synced - Enabling Node Protocol Data Mapping")
+                                // Unlock node protocol mapping when sync is finished to allow data updates
+                                //nodeprotocol.Unlock()
+
+                                for _, nodeType := range params.NodeTypes {
+
+                                        // Get current state snapshot
+                                        state, err := pm.blockchain.StateAt(pm.blockchain.CurrentBlock().Root())
+
+                                        if err == nil {
+                                                nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
+
+                                                if nodeCount > 0 {
+
+                                                        // Determine next reward candidate based on statedb
+                                                        nodeId, _ := nodeprotocol.GetNodeCandidate(state, block.Hash(), nodeCount, nodeType.ContractAddress)
+
+                                                        // Mapping to track existing peerset
+                                                        var peerMapping map[string]string
+                                                        peerMapping = make(map[string]string)
+
+                                                        // Iterate through peerset and assign to mapping
+                                                        for _, peer := range pm.peers.peers {
+                                                                peerId := nodeprotocol.GetNodeId(peer.Peer.Node())
+                                                                peerMapping[peerId] = peerId
+                                                        }
+
+                                                        // Check to see if next node up for reward is one of our peers - if it is broadcast validations
+                                                        if _, ok := peerMapping[nodeId]; ok {
+                                                                //log.Info("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name)
+                                                                var data = []string{nodeType.Name, nodeId, block.ParentHash().String()}
+                                                                peerId := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode().Server().Self())
+                                                                nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, peerId, len(pm.peers.peers), block.Hash())
+                                                                go pm.AsyncSendNodeProtocolData(data)
+                                                        } else {
+                                                                //log.Info("Reward Candidate Not Found in Peerset - Requesting Node Activity Data", "Type", nodeType.Name)
+                                                                var data = []string{nodeType.Name, block.Hash().String()}
+                                                                go pm.AsyncGetNodeProtocolData(data)
+	                                                        data = []string{nodeType.Name, block.ParentHash().String()}
+                                                                go pm.AsyncGetNodeProtocolData(data)
+                                                                grandParent := pm.blockchain.GetBlockByHash(block.ParentHash())
+                                                                if grandParent != nil {
+                                                                        data = []string{nodeType.Name, grandParent.Hash().String()}
+                                                                        go pm.AsyncGetNodeProtocolData(data)
+                                                                        data = []string{nodeType.Name, grandParent.ParentHash().String()}
+                                                                        go pm.AsyncGetNodeProtocolData(data)
+                                                                }
+                                                        }
+                                                }
+                                        }
+                               // }
+                        }
+                }
+                /*for _, nodeType := range params.NodeTypes {
                         if nodeprotocol.CheckUpToDate(nodeType.Name, request.Block.Hash()) {
                                 nodeId := nodeprotocol.GetNodeProtocolData(nodeType.Name, request.Block.Hash())
                                 var data = []string{nodeType.Name, nodeId, request.Block.Hash().String()}
@@ -741,7 +884,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                                 var data = []string{nodeType.Name, request.Block.Hash().String()}
                                 p.RequestNodeProtocolData(data)
                         }
-                }
+                }*/
 
 		// Assuming the block is importable by the peer, but possibly not yet done so,
 		// calculate the head hash and TD that the peer truly must have.
@@ -761,7 +904,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				go pm.synchronise(p)
 			}
 		}
-
 	case msg.Code == TxMsg:
 		// Transactions arrived, make sure we have a valid and fresh chain to handle them
 		if atomic.LoadUint32(&pm.acceptTxs) == 0 {
@@ -812,8 +954,87 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 			transferLen = len(peers)
 		}
 		transfer := peers[:transferLen]
-		for _, peer := range transfer {
-                        // Check for next node up for reward
+
+                // Check for next node up for reward
+                currentBlock := pm.blockchain.CurrentBlock()
+                if nodeprotocol.NodeFlag && currentBlock.Header().Number.Int64() > params.NodeProtocolBlock{
+
+                        //var isSyncing bool
+                        //isSyncing = pm.blockchain.CurrentFastBlock().NumberU64() == block.NumberU64()
+
+                        //if !isSyncing {
+                        //_, td := p.Head()
+                        //currentTd := pm.blockchain.GetTd(block.Header().Hash(), block.Header().Number.Uint64())
+                        //if td != nil && currentTd != nil {
+                        //if td.Cmp(currentTd) >= 0 {
+                        //if pm.blockchain.GetTd(block.Hash(), block.NumberU64()).Cmp(p.td) != -1 {
+                        //if atomic.LoadUint32(&pm.acceptTxs) == 1 {
+                        //        log.Info("Chain is Synced - Enabling Node Protocol Data Mapping")
+                                // Unlock node protocol mapping when sync is finished to allow data updates
+                                //nodeprotocol.Unlock()
+
+                                for _, nodeType := range params.NodeTypes {
+
+                                        // Get current state snapshot
+                                        state, err := pm.blockchain.StateAt(pm.blockchain.CurrentBlock().Root())
+
+                                        if err == nil {
+                                                nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
+
+                                                if nodeCount > 0 {
+
+                                                        // Determine next reward candidate based on statedb
+                                                        nodeId, _ := nodeprotocol.GetNodeCandidate(state, currentBlock.Hash(), nodeCount, nodeType.ContractAddress)
+
+                                                        // Mapping to track existing peerset
+                                                        var peerMapping map[string]string
+                                                        peerMapping = make(map[string]string)
+
+                                                        // Iterate through peerset and assign to mapping
+                                                        for _, peer := range pm.peers.peers {
+                                                                peerId := nodeprotocol.GetNodeId(peer.Peer.Node())
+                                                                peerMapping[peerId] = peerId
+                                                        }
+
+                                                        // Check to see if next node up for reward is one of our peers - if it is broadcast validations
+                                                        if _, ok := peerMapping[nodeId]; ok {
+                                                                //log.Info("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name)
+                                                                var data = []string{nodeType.Name, nodeId, currentBlock.Hash().String()}
+                                                                peerId := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode().Server().Self())
+                                                                nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, peerId, len(pm.peers.peers), currentBlock.Hash())
+                                                                go pm.AsyncSendNodeProtocolData(data)
+                                                        } else {
+                                                                //log.Info("Reward Candidate Not Found in Peerset - Requesting Node Activity Data", "Type", nodeType.Name)
+                                                                //var data = []string{nodeType.Name, currentBlock.Hash().String()}
+                                                                //go pm.AsyncGetNodeProtocolData(data)
+                                                                var data = []string{nodeType.Name, currentBlock.Hash().String()}
+                                                                go pm.AsyncGetNodeProtocolData(data)
+                                                                data = []string{nodeType.Name, currentBlock.ParentHash().String()}
+                                                                go pm.AsyncGetNodeProtocolData(data)
+                                                                grandParent := pm.blockchain.GetBlockByHash(currentBlock.ParentHash())
+                                                                if grandParent != nil {
+                                                                        data = []string{nodeType.Name, grandParent.Hash().String()}
+                                                                        go pm.AsyncGetNodeProtocolData(data)
+                                                                        data = []string{nodeType.Name, grandParent.ParentHash().String()}
+                                                                        go pm.AsyncGetNodeProtocolData(data)
+                                                                }
+                                                        }
+                                                }
+                                        }
+                               // }
+                        }
+                }
+                /*for _, nodeType := range params.NodeTypes {
+                        if nodeprotocol.CheckUpToDate(nodeType.Name, request.Block.Hash()) {
+                                nodeId := nodeprotocol.GetNodeProtocolData(nodeType.Name, request.Block.Hash())
+                                var data = []string{nodeType.Name, nodeId, request.Block.Hash().String()}
+                                p.SendNodeProtocolData(data)
+                        } else {
+                                var data = []string{nodeType.Name, request.Block.Hash().String()}
+                                p.RequestNodeProtocolData(data)
+                        }
+                }*/
+/*                        // Check for next node up for reward
                         if nodeprotocol.NodeFlag {
 
                                 for _, nodeType := range params.NodeTypes {
@@ -832,16 +1053,17 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
                                                         log.Info("Node ID Match - Sending Evidence of Local Node Activity", "Type", nodeType.Name, "Local ID", nodeprotocol.EnodeId, "Matching State ID", nodeId)
                                                         var data = []string{nodeType.Name, nodeId, block.Hash().String()}
                                                         nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, block.Hash())
-                                                        peer.SendNodeProtocolData(data)
+                                                        go pm.AsyncSendNodeProtocolData(data)
                                                 } else {
                                                         log.Info("Node ID Not Found - Requesting Node Activity Data", "Type", nodeType.Name, "Local ID", nodeprotocol.EnodeId, "Matching State ID", nodeId)
                                                         var data = []string{nodeType.Name, block.Hash().String()}
-                                                        peer.RequestNodeProtocolData(data)
+                                                        go pm.AsyncGetNodeProtocolData(data)
                                                 }
                                         }
                                 }
-                        }
+                        }*/
 
+		for _, peer := range transfer {
 			peer.AsyncSendNewBlock(block, td)
 		}
 		log.Trace("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
@@ -856,6 +1078,25 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 		log.Trace("Announced block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 	}
 
+}
+
+func (pm *ProtocolManager) AsyncSendNodeProtocolData(data []string) {
+	// Broadcast data to a batch of peers not knowing about block
+	//peers := pm.peers.PeersWithoutBlock(common.HexToHash(data[2]))
+	peerset := pm.peers
+        for _, peer := range peerset.peers {
+		peer.SendNodeProtocolData(data)
+	}
+	log.Trace("Broadcasting Node Protocol Data", "Type", data[0], "Hash", data[2])
+}
+
+func (pm *ProtocolManager) AsyncGetNodeProtocolData(data []string) {
+	// Requesting data from a peerset
+	peerset := pm.peers
+        for _, peer := range peerset.peers {
+		peer.RequestNodeProtocolData(data)
+	}
+	log.Trace("Requesting Node Protocol Data", "Type", data[0], "Hash", data[1])
 }
 
 // BroadcastTxs will propagate a batch of transactions to all peers which are not known to

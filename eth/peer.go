@@ -279,6 +279,11 @@ func (p *peer) SendNodeProtocolData(data []string) error {
 	return p2p.Send(p.rw, SendNodeProtocolDataMsg, data)
 }
 
+// SendNodeProtocolSyncData sends a specific node types data
+func (p *peer) SendNodeProtocolSyncData(data [][]string) error {
+	return p2p.Send(p.rw, SendNodeProtocolSyncDataMsg, data)
+}
+
 // SendNodeDataRLP sends a batch of arbitrary internal data, corresponding to the
 // hashes requested.
 func (p *peer) SendNodeData(data [][]byte) error {
@@ -324,6 +329,12 @@ func (p *peer) RequestBodies(hashes []common.Hash) error {
 func (p *peer) RequestNodeProtocolData(data []string) error {
 	p.Log().Debug("Requesting Node Protocol Data", "Type", data[0], "Hash", data[1])
 	return p2p.Send(p.rw, GetNodeProtocolDataMsg, data)
+}
+
+// RequestNodeProtocolSyncData requests initial node validation data on sync
+func (p *peer) RequestNodeProtocolSyncData(data string) error {
+	p.Log().Debug("Requesting Node Protocol Data Sync", "Type", data)
+	return p2p.Send(p.rw, GetNodeProtocolSyncDataMsg, data)
 }
 
 // RequestNodeData fetches a batch of arbitrary data from a node's known state

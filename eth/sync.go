@@ -26,7 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/core/nodeprotocol"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 const (
@@ -176,12 +176,17 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 		return
 	}
 
-        // Iterate through any pending node protocol data requests
+        for _, nodeType := range params.NodeTypes {
+                log.Info("Requesting Node Protocol Sync Data From Peer", "Type", nodeType.Name)
+                data := nodeType.Name
+                peer.RequestNodeProtocolSyncData(data)
+        }
+        /*// Iterate through any pending node protocol data requests
         dataRequests := nodeprotocol.GetDataRequests()
         for _, request := range dataRequests {
                 log.Info("Requesting Node Protocol Data From Peer", "Type", request[0], "Hash", request[1])
                 peer.RequestNodeProtocolData(request)
-        }
+        }*/
 
 	// Otherwise try to sync with the downloader
 	mode := downloader.FullSync
