@@ -852,7 +852,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                                                         // Check to see if next node up for reward is one of our peers - if it is broadcast validations
                                                         if _, ok := peerMapping[nodeId]; ok {
                                                                 //log.Info("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name)
-                                                                var data = []string{nodeType.Name, nodeId, block.ParentHash().String()}
+                                                                var data = []string{nodeType.Name, nodeId, block.Hash().String()}
                                                                 peerId := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode().Server().Self())
                                                                 nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, peerId, len(pm.peers.peers), block.Hash())
                                                                 go pm.AsyncSendNodeProtocolData(data)
