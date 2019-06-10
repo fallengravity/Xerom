@@ -589,11 +589,10 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
                                 // Determine next reward candidate
                                 nodeId, nodeAddress := nodeprotocol.GetNodeCandidate(state, grandParent.Header().ParentHash, nodeCount, nodeType.ContractAddress)
 
-                                /*if nodeprotocol.CheckUpToDate(nodeType.Name, grandParent.Header().ParentHash) {
-                                        state.SetCode(common.BytesToAddress(append([]byte(nodeType.Name), grandParent.Header().ParentHash.Bytes()...)), []byte(nodeId))
-                                }*/
+                                // Output node protocol data sync status
+                                nodeprotocol.IsSynced(nodeType.Name)
+
                                 if nodeprotocol.CheckNodeStatus(header.Number.Uint64(), header.Hash(), parent.Hash(), parent.ParentHash(), nodeType.Name, nodeId, grandParent.Header().ParentHash) {
-                                //if common.BytesToAddress(state.GetCode(common.BytesToAddress(append([]byte(nodeType.Name), grandParent.Header().ParentHash.Bytes()...)))) == common.BytesToAddress([]byte(nodeId)) {
                                         log.Info("Node Status Verified", "Node Type", nodeType.Name)
                                         nodeAddresses = append(nodeAddresses, nodeAddress)
                                 } else {

@@ -181,12 +181,6 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
                 data := nodeType.Name
                 peer.RequestNodeProtocolSyncData(data)
         }
-        /*// Iterate through any pending node protocol data requests
-        dataRequests := nodeprotocol.GetDataRequests()
-        for _, request := range dataRequests {
-                log.Info("Requesting Node Protocol Data From Peer", "Type", request[0], "Hash", request[1])
-                peer.RequestNodeProtocolData(request)
-        }*/
 
 	// Otherwise try to sync with the downloader
 	mode := downloader.FullSync

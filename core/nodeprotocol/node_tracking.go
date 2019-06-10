@@ -42,9 +42,6 @@ type protocolData struct {
 }
 var lockedFlag bool
 var protocolInitiationFlag bool
-//var EnodeId string
-//var blockChainService *core.BlockChain
-//var awaitingDataRequests map[string][]string
 
 func ActiveNode() *node.Node {
 	return activeNode
@@ -53,9 +50,7 @@ func ActiveNode() *node.Node {
 func SetActiveNode(stack *node.Node) {
 	activeNode = stack
         SetupNodeProtocolMapping()
-        //setNodeId()
-        //Enodeid = enode.ID()
-        //log.Info("Node Protocol Node ID Setup Confirmed", "ID", enode.ID())
+        Lock()
 }
 
 func Unlock() {
@@ -69,15 +64,16 @@ func Lock() {
 func IsLocked() bool {
         return lockedFlag
 }
-/*
-func UpdateBlockChainService(bc *core.BlockChain) {
-        blockChainService = bc
+
+func IsSynced(nodeType string) bool {
+        if  len(nodeProtocolData[nodeType].nodeData) > 100 && len(nodeProtocolData[nodeType].hashData) > 100 {
+                log.Info("Node Protocol Mapping Sync Status", "Status", "Synced")
+                return true
+        }
+        log.Warn("Node Protocol Mapping Sync Status", "Status", "Not Synced", "Node Entries", len(nodeProtocolData[nodeType].nodeData), "Hash Entries", len(nodeProtocolData[nodeType].hashData))
+        return false
 }
 
-func GetBlockChainService() *core.BlockChain {
-        return blockChainService
-}
-*/
 // CheckNodeProtocolStatus determines if node protocol data has been initiated
 func CheckNodeProtocolStatus() bool {
         if len(nodeProtocolData) > 0 {
@@ -87,30 +83,12 @@ func CheckNodeProtocolStatus() bool {
 
 }
 
-/*// AddDataRequest adds requests for node activity data to queue
-func AddDataRequest(nodeType string, blockHash string) {
-        if len(awaitingDataRequests) == 0 {
-                awaitingDataRequests = make(map[string][]string)
-        }
-        awaitingDataRequests[nodeType + blockHash] = []string{nodeType, blockHash}
-}
-
-// GetDataRequests returns queued data requests and resets list
-func GetDataRequests() [][]string {
-        var dataRequests [][]string
-        for _, requests := range awaitingDataRequests {
-                dataRequests = append(dataRequests, requests)
-        }
-        awaitingDataRequests = make(map[string][]string)
-        return dataRequests
-}*/
-
 // SetupNodeProtocolMap initiates node protocol mapping
 func SetupNodeProtocolMapping() {
         if !protocolInitiationFlag {
                 protocolInitiationFlag = true
                 // Lock protocol mapping on initiation to prevent bad data during sync
-                Lock()
+                //Lock()
 
                 log.Info("Initializing Node Protocol Data Mapping")
                 nodeProtocolData = make(map[string]protocolData)
@@ -142,34 +120,11 @@ func CheckNodeStatus(blockHeight uint64, currentHash common.Hash, parentHash com
                         return true
                 }
         }
-        //log.Warn("Block Height", "Number", blockHeight, "Current Hash", currentHash, "Parent Hash", parentHash, "Grand Parent Hash", grandParentHash, "Great Grand Parent Hash", blockHash)
-        //log.Warn("Block Height", "Number", blockHeight, "Current Node", nodeProtocolData[nodeType].dataMap[currentHash], "Parent Node", nodeProtocolData[nodeType].dataMap[parentHash], "Grand Parent Node", nodeProtocolData[nodeType].dataMap[grandParentHash], "Great Grand Parent Node", nodeProtocolData[nodeType].dataMap[blockHash])
-
-        // log.Warn("Newest Saved Block Hash", "Hash", nodeProtocolData[nodeType].hashData[len(nodeProtocolData[nodeType].hashData) - 1])
-        //log.Warn("Newest Saved Verified Node ID", "ID", nodeProtocolData[nodeType].nodeData[len(nodeProtocolData[nodeType].nodeData) - 1])
-
         log.Warn("Node ID Not Found in Node Protocol Data", "Validated", "False", "Type", nodeType, "ID Needing Verification", nodeId, "Hash", blockHash, "Saved ID", nodeProtocolData[nodeType].dataMap[blockHash])
 
-        /*for i := 0; i < len(nodeProtocolData[nodeType].hashData); i++ {
-                log.Warn("Outputting Current Node Protocol Data", "I", i, "Hash", nodeProtocolData[nodeType].hashData[i], "ID", nodeProtocolData[nodeType].nodeData[i])
-        }*/
-
-
         return false
 }
-/*
-// CheckNodeStateStatus checks to see if specified node has been validated and saved to statedb
-func CheckNodeStateStatus(state *state.StateDB, nodeType string, nodeId string, blockHash common.Hash) bool {
-        stateData := common.BytesToAddress(state.GetCode(common.BytesToAddress(append([]byte(nodeType), blockHash.Bytes()...))))
 
-        if stateData == common.BytesToAddress([]byte(nodeId)) {
-                log.Info("Node ID Found in Node Protocol State Data", "Validated", "True", "Type", nodeType, "ID", nodeId, "State Data", stateData, "Compare Data", common.BytesToAddress([]byte(nodeId)))
-                return true
-        }
-        log.Warn("Node ID Not Found in Node Protocol State Data", "Validated", "False", "Type", nodeType, "ID", nodeId)
-        return false
-}
-*/
 // CheckUpToDate checks to see if blockHash has been recorderd in mapping
 func CheckUpToDate(nodeType string, blockHash common.Hash) bool {
         if len(nodeProtocolData) == 0 {
@@ -189,11 +144,9 @@ func GetNodeProtocolData(nodeType string, blockHash common.Hash) string {
         }
 
         if nodeId, ok := nodeProtocolData[nodeType].dataMap[blockHash]; ok {
-                log.Info("Node ID Found in Node Protocol Data", "Type", nodeType, "ID", nodeId, "Hash", blockHash)
                 return nodeId
         }
 
-        log.Warn("Node ID Not Found in Node Protocol Data", "Type", nodeType, "Hash", blockHash)
         return ""
 }
 
@@ -205,8 +158,8 @@ func UpdateNodeProtocolData(nodeType string, nodeId string, peerId string, peerC
 
         // Check to see if protocol mapping is locked prior to modifying/adding data
         if !lockedFlag {
-                if id, ok := nodeProtocolData[nodeType].dataMap[blockHash]; ok {
-                        log.Warn("Duplicate Node ID Data Found in Node Protocol Data - Checking Peer Consensus", "Type", nodeType, "ID", id, "Hash", blockHash)
+                Lock()  // Lock to eliminate data errors
+                if _, ok := nodeProtocolData[nodeType].dataMap[blockHash]; ok {
 
                         consensusData := nodeProtocolData[nodeType].nodeConsensusMap
                         if peerMap, ok := consensusData[blockHash][nodeId]; ok {
@@ -216,7 +169,7 @@ func UpdateNodeProtocolData(nodeType string, nodeId string, peerId string, peerC
                                         hashes := nodeProtocolData[nodeType].hashData
                                         nodes := nodeProtocolData[nodeType].nodeData
                                         dataMapping := nodeProtocolData[nodeType].dataMap
-                                        if len(peerMap) > (peerCount / 2) {
+                                        if len(peerMap) > (peerCount / 2) && dataMapping[blockHash] != nodeId {
                                                 dataMapping[blockHash] = nodeId
 
                                                 for i := 0; i < len(hashes); i++ {
@@ -225,7 +178,7 @@ func UpdateNodeProtocolData(nodeType string, nodeId string, peerId string, peerC
                                                                 break
                                                         }
                                                 }
-                                                log.Warn("Node ID Updated in Node Protocol Data - Consensus Override", "Type", nodeType, "ID", nodeId, "Hash", blockHash)
+                                                log.Warn("Node Protocol Data Updated - Node ID Consensus Override", "Type", nodeType, "ID", nodeId, "Hash", blockHash)
                                          }
                                          consensusData[blockHash][nodeId] = peerMap
                                          data := protocolData{nodeConsensusMap: consensusData, dataMap: dataMapping, nodeData: nodes, hashData: hashes}
@@ -256,21 +209,18 @@ func UpdateNodeProtocolData(nodeType string, nodeId string, peerId string, peerC
                                 lastBlockHash := hashes[0]
                                 delete(dataMapping, lastBlockHash)
                                 delete(nodeConsensus, lastBlockHash)
-                                hashes = hashes[1:(hashDataLength-1)]
+                                hashes = hashes[1:(hashDataLength)]
                         }
                         // Trim nodeDataLength - keep history to around 2 hours
                         if nodeDataLength > 550 {
-                                nodes = nodes[1:(nodeDataLength-1)]
+                                nodes = nodes[1:(nodeDataLength)]
                         }
 
-                        // One final check to be sure hash was not previously added
-                        if nodeId, ok := nodeProtocolData[nodeType].dataMap[blockHash]; ok {
-                                data := protocolData{nodeConsensusMap: nodeConsensus, dataMap: dataMapping, nodeData: nodes, hashData: hashes}
-                                nodeProtocolData[nodeType] = data
-
-                                log.Info("Node ID Saved To Node Protocol Data", "Type", nodeType, "ID", nodeId, "Hash", blockHash)
-                        }
+                        data := protocolData{nodeConsensusMap: nodeConsensus, dataMap: dataMapping, nodeData: nodes, hashData: hashes}
+                        nodeProtocolData[nodeType] = data
+                        log.Info("Node Protocol Data Updated - Node ID Saved To Node Protocol Data", "Type", nodeType, "ID", nodeId, "Hash", blockHash)
                 }
+                Unlock()
         }
 }
 
@@ -280,7 +230,10 @@ func SyncNodeProtocolData(nodeType string, nodes []string, hashes []string) {
                 SetupNodeProtocolMapping()
         }
 
+        Lock() // Lock so no data is added during sync
+
         if lockedFlag {
+
                 nodeDataLength := len(nodeProtocolData[nodeType].nodeData)
                 hashDataLength := len(nodeProtocolData[nodeType].hashData)
 
@@ -291,6 +244,9 @@ func SyncNodeProtocolData(nodeType string, nodes []string, hashes []string) {
                 localNodeConsensus := nodeProtocolData[nodeType].nodeConsensusMap
 
                 if len(nodes) >= nodeDataLength && len(hashes) >= hashDataLength && len(nodes) == len(hashes) {
+
+                        log.Info("Saving Received Node Protocol Data Into Mapping")
+
                         var updatedHashes []common.Hash
                         //for _, data := range hashes {
                         for i := 0; i < len(hashes); i++ {
@@ -301,13 +257,6 @@ func SyncNodeProtocolData(nodeType string, nodes []string, hashes []string) {
                                 localNodeConsensus[updatedHash] = make(map[string]map[string]string)
                         }
 
-                        /*for _, data := range nodes {
-                                log.Info("Syncing Node ID Data", "Type", nodeType, "ID", data)
-                        }*/
-                        /*for _, data := range updatedHashes {
-                                log.Info("Syncing Node ID Data", "Type", nodeType, "Hash", data)
-                        }*/
-
                         updatedData := protocolData{nodeConsensusMap: localNodeConsensus, dataMap: localDataMap, nodeData: nodes, hashData: updatedHashes}
                         nodeProtocolData[nodeType] = updatedData
 
@@ -316,6 +265,8 @@ func SyncNodeProtocolData(nodeType string, nodes []string, hashes []string) {
                 } else {
                        log.Error("Invalid Node Protocol Sync Data Receieved - Rolling Back Data Mapping")
                 }
+                // Unlock data mapping now that sync attempt is complete
+                Unlock()
         }
 }
 
@@ -334,13 +285,6 @@ func GetNodeProtocolSyncHashData(nodeType string) []string {
         }
         return hashes
 }
-/*
-// UpdateNodeProtocolStateData updates protocol mapping data for verified nodes
-func UpdateNodeProtocolStateData(state *state.StateDB, nodeType string, nodeId string, blockHash common.Hash) {
-        log.Info("Saving Node Protocol Data To State", "Type", nodeType, "ID", nodeId, "Hash", blockHash, "State Address", common.BytesToAddress(append([]byte(nodeType), blockHash.Bytes()...)))
-        state.SetCode(common.BytesToAddress(append([]byte(nodeType), blockHash.Bytes()...)), []byte(nodeId))
-}
-*/
 
 // GetNodeId return enodeid in string format from *enode.Node
 func GetNodeId(n *enode.Node) string {
@@ -371,27 +315,3 @@ func GetNodeId(n *enode.Node) string {
         }
         return u.User.String()
 }
-/*
-// Get user home directory from env
-func getHomeDirectory() string {
-    usr, err := user.Current()
-    if err != nil {
-        log.Error("Unable To Find Home Directory" )
-    }
-    return usr.HomeDir
-}
-
-// Retrieve nodekey and calculate enodeid
-func setNodeId() {
-    b, err := ioutil.ReadFile(getHomeDirectory() + "/.xerom/geth/nodekey")
-    if err != nil {
-        fmt.Print(err)
-    }
-    enodeId, err := crypto.HexToECDSA(string(b))
-    if err != nil {
-        fmt.Print(err)
-    }
-    pubkeyBytes := crypto.FromECDSAPub(&enodeId.PublicKey)[1:]
-    EnodeId = hex.EncodeToString(pubkeyBytes)
-}
-*/
