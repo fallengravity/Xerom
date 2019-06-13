@@ -38,6 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 	cli "gopkg.in/urfave/cli.v1"
 )
@@ -365,4 +366,8 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	        nodeprotocol.SetProtocolFlag(false)
         }
 	nodeprotocol.SetActiveNode(stack)
+
+        for _, nodeType := range params.NodeTypes {
+                nodeprotocol.InitiateNodeProtocolStateAccess(nodeType.Name)
+        }
 }

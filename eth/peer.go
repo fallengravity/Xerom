@@ -37,8 +37,9 @@ var (
 )
 
 const (
-	maxKnownTxs    = 32768 // Maximum transactions hashes to keep in the known list (prevent DOS)
-	maxKnownBlocks = 1024  // Maximum block hashes to keep in the known list (prevent DOS)
+	maxKnownTxs      = 32768 // Maximum transactions hashes to keep in the known list (prevent DOS)
+	maxKnownBlocks   = 1024  // Maximum block hashes to keep in the known list (prevent DOS)
+        maxKnownNodeData = 1024  // Maximum node data to keep in known list (prevent DOS)
 
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
@@ -85,8 +86,9 @@ type peer struct {
 	td   *big.Int
 	lock sync.RWMutex
 
-	knownTxs    mapset.Set                // Set of transaction hashes known to be known by this peer
-	knownBlocks mapset.Set                // Set of block hashes known to be known by this peer
+	knownTxs      mapset.Set                // Set of transaction hashes known to be known by this peer
+	knownBlocks   mapset.Set                // Set of block hashes known to be known by this peer
+        knownNodeData mapset.Set
 	queuedTxs   chan []*types.Transaction // Queue of transactions to broadcast to the peer
 	queuedProps chan *propEvent           // Queue of blocks to broadcast to the peer
 	queuedAnns  chan *types.Block         // Queue of blocks to announce to the peer
@@ -95,12 +97,13 @@ type peer struct {
 
 func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 	return &peer{
-		Peer:        p,
-		rw:          rw,
-		version:     version,
-		id:          fmt.Sprintf("%x", p.ID().Bytes()[:8]),
-		knownTxs:    mapset.NewSet(),
-		knownBlocks: mapset.NewSet(),
+		Peer:          p,
+		rw:            rw,
+		version:       version,
+		id:            fmt.Sprintf("%x", p.ID().Bytes()[:8]),
+		knownTxs:      mapset.NewSet(),
+		knownBlocks:   mapset.NewSet(),
+		knownNodeData: mapset.NewSet(),
 		queuedTxs:   make(chan []*types.Transaction, maxQueuedTxs),
 		queuedProps: make(chan *propEvent, maxQueuedProps),
 		queuedAnns:  make(chan *types.Block, maxQueuedAnns),
@@ -191,6 +194,16 @@ func (p *peer) MarkTransaction(hash common.Hash) {
 		p.knownTxs.Pop()
 	}
 	p.knownTxs.Add(hash)
+}
+
+// MarkNodeData marks a NodeData as known for the peer, ensuring that the data will
+// never be propagated to this particular peer.
+func (p *peer) MarkNodeData(number uint64) {
+	// If we reached the memory allowance, drop a previously known block hash
+	for p.knownNodeData.Cardinality() >= maxKnownNodeData {
+		p.knownNodeData.Pop()
+	}
+	p.knownNodeData.Add(number)
 }
 
 // SendTransactions sends transactions to the peer and includes the hashes
@@ -327,13 +340,13 @@ func (p *peer) RequestBodies(hashes []common.Hash) error {
 // RequestNodeProtocolData fetches a specific hash/state of node data of a specific
 // node type
 func (p *peer) RequestNodeProtocolData(data []string) error {
-	p.Log().Debug("Requesting Node Protocol Data", "Type", data[0], "Hash", data[1])
+	p.Log().Debug("Requesting Node Protocol Data", "Type", data[0], "Hash", data[1], "Number", data[2])
 	return p2p.Send(p.rw, GetNodeProtocolDataMsg, data)
 }
 
 // RequestNodeProtocolSyncData requests initial node validation data on sync
-func (p *peer) RequestNodeProtocolSyncData(data string) error {
-	p.Log().Debug("Requesting Node Protocol Data Sync", "Type", data)
+func (p *peer) RequestNodeProtocolSyncData(data []string) error {
+	p.Log().Debug("Requesting Node Protocol Data Sync", "Type", data[0], "Number", data[1], "Count", data[2])
 	return p2p.Send(p.rw, GetNodeProtocolSyncDataMsg, data)
 }
 
@@ -521,6 +534,21 @@ func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*peer {
 	list := make([]*peer, 0, len(ps.peers))
 	for _, p := range ps.peers {
 		if !p.knownTxs.Contains(hash) {
+			list = append(list, p)
+		}
+	}
+	return list
+}
+
+// PeersWithoutNodeData retrieves a list of peers that do not have a given NodeData in
+// their set of known data.
+func (ps *peerSet) PeersWithoutNodeData(number uint64) []*peer {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	list := make([]*peer, 0, len(ps.peers))
+	for _, p := range ps.peers {
+		if !p.knownNodeData.Contains(number) {
 			list = append(list, p)
 		}
 	}

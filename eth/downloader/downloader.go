@@ -24,12 +24,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+        "strconv"
 
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/nodeprotocol"
+	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -339,10 +341,6 @@ func (d *Downloader) Synchronise(id string, head common.Hash, td *big.Int, mode 
 			log.Warn("Downloader wants to drop peer, but peerdrop-function is not set", "peer", id)
 		} else {
 			d.dropPeer(id)
-
-                        // Reset & resync node protocol data
-                        log.Warn("Resetting & Resyncing  Node Protocol Data")
-                        nodeprotocol.ResetNodeProtocolData()
 		}
 	default:
 		log.Warn("Synchronisation failed, retrying", "err", err)
@@ -464,6 +462,52 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 			}
 		}
 	}
+
+        // Node protocol peer synchronising
+        peerHead, err := d.fetchHeight(p)
+        if err == nil && peerHead.Number.Int64() >= params.NodeProtocolBlock {
+                syncStartBlock := origin
+                syncBlockCount := peerHead.Number.Uint64() - syncStartBlock
+
+                nodeprotocol.SetTargetSyncNumber(peerHead.Number.Uint64())
+                protocolHeadStateChannel := nodeprotocolmessaging.GetNodeProtocolHeadChannel()
+
+                if syncBlockCount > 200 {
+                        for i := syncStartBlock; i < (syncStartBlock + syncBlockCount); i = i + 200 {
+                                blockCount := uint64(200)
+                                if (i + blockCount) > peerHead.Number.Uint64() {
+                                        //blockCount = peerHead.Number.Uint64() - i
+                                }
+                                log.Info("Node Protocol Data Synchronisation In Progress", "Start Block", i, "End Block", i + blockCount)
+
+                                for _, nodeType := range params.NodeTypes {
+                                        data := []string{nodeType.Name, strconv.FormatUint(i, 10), strconv.FormatUint(uint64(blockCount), 10)}
+                                        go nodeprotocolmessaging.RequestNodeProtocolSyncData(data)
+                                }
+                                // Wait here for node protocol data sync
+                                select {
+                                case msg := <-protocolHeadStateChannel:
+                                        // Check to see if we have successfully synced
+                                        // node protocol data
+                                        log.Info("Node Protocol Data Synchronised With Local State", "Number", msg)
+                                }
+                        }
+                } else {
+                        log.Info("Node Protocol Data Synchronisation In Progess", "Start Block", syncStartBlock, "End Block", syncStartBlock + syncBlockCount)
+                        for _, nodeType := range params.NodeTypes {
+                                data := []string{nodeType.Name, strconv.FormatUint(syncStartBlock, 10), strconv.FormatUint(uint64(syncBlockCount), 10)}
+                                go nodeprotocolmessaging.RequestNodeProtocolSyncData(data)
+                        }
+                        // Wait here for node protocol data sync
+                        select {
+                        case msg := <-protocolHeadStateChannel:
+                                // Check to see if we have successfully synced
+                                // node protocol data
+                                log.Info("Node Protocol Data Synchronised With Local State", "Number", msg)
+                        }
+                }
+        }
+
 	d.committed = 1
 	if d.mode == FastSync && pivot != 0 {
 		d.committed = 0

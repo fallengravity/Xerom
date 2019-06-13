@@ -590,9 +590,9 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
                                 nodeId, nodeAddress := nodeprotocol.GetNodeCandidate(state, grandParent.Header().ParentHash, nodeCount, nodeType.ContractAddress)
 
                                 // Output node protocol data sync status
-                                nodeprotocol.IsSynced(nodeType.Name)
+                                //go nodeprotocol.IsSynced(nodeType.Name, grandParent.Header().ParentHash, grandParent.NumberU64())
 
-                                if nodeprotocol.CheckNodeStatus(header.Number.Uint64(), header.Hash(), parent.Hash(), parent.ParentHash(), nodeType.Name, nodeId, grandParent.Header().ParentHash) {
+                                if nodeprotocol.CheckNodeStatus(header.Number.Uint64(), header.Hash(), parent.Hash(), parent.ParentHash(), nodeType.Name, nodeId, grandParent.Header().ParentHash, (grandParent.NumberU64()-1)) {
                                         log.Info("Node Status Verified", "Node Type", nodeType.Name)
                                         nodeAddresses = append(nodeAddresses, nodeAddress)
                                 } else {
