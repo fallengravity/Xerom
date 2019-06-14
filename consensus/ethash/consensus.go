@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/nodeprotocol"
+	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -570,48 +571,50 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 	var nodeAddresses []common.Address
 	var nodeRemainders []*big.Int
 
-        //Checking for active node
-        nodeprotocol.CheckActiveNode()
-
 	// If node-protocol is active, validate node payment address
-	if header.Number.Int64() > params.NodeProtocolBlock {
+	if header.Number.Int64() > params.NodeProtocolBlock && header.Number.Int64() > 105 {
 
-                parent := chain.GetBlock(header.ParentHash, header.Number.Uint64()-1)
-                grandParent := chain.GetBlock(parent.Header().ParentHash, parent.NumberU64()-1)
+                //Checking for active node
+                nodeprotocol.CheckActiveNode()
 
-                for _, nodeType := range params.NodeTypes {
+                rewardHeader := chain.GetHeaderByNumber(header.Number.Uint64() - 105)
 
-                        // Get total node count from contract and save
-                        nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
+                rewardStateHeader := chain.GetHeaderByNumber(header.Number.Uint64() - 5)
+                rewardState, stateErr := nodeprotocolmessaging.GetStateAt(rewardStateHeader.Root)
 
-                        if nodeCount > 0 {
+                if stateErr == nil {
 
-                                // Determine next reward candidate
-                                nodeId, nodeAddress := nodeprotocol.GetNodeCandidate(state, grandParent.Header().ParentHash, nodeCount, nodeType.ContractAddress)
+                        for _, nodeType := range params.NodeTypes {
 
-                                // Output node protocol data sync status
-                                //go nodeprotocol.IsSynced(nodeType.Name, grandParent.Header().ParentHash, grandParent.NumberU64())
+                                // Get total node count from contract and save
+                                nodeCount := nodeprotocol.GetNodeCount(rewardState, nodeType.ContractAddress)
 
-                                if nodeprotocol.CheckNodeStatus(header.Number.Uint64(), header.Hash(), parent.Hash(), parent.ParentHash(), nodeType.Name, nodeId, grandParent.Header().ParentHash, (grandParent.NumberU64()-1)) {
-                                        log.Info("Node Status Verified", "Node Type", nodeType.Name)
-                                        nodeAddresses = append(nodeAddresses, nodeAddress)
+                                if nodeCount > 0 {
+
+                                        // Determine next reward candidate
+                                        nodeId, nodeAddress := nodeprotocol.GetNodeCandidate(rewardState, rewardHeader.Hash(), nodeCount, nodeType.ContractAddress)
+
+                                        if nodeprotocol.CheckNodeStatus(nodeType.Name, nodeId, rewardHeader.Hash(), rewardHeader.Number.Uint64()) {
+                                                log.Info("Node Status Verified", "Node Type", nodeType.Name)
+                                                nodeAddresses = append(nodeAddresses, nodeAddress)
+                                        } else {
+                                                log.Warn("Node Status Not Verified - Deferring To Remainder Address", "Node Type", nodeType.Name)
+                                                nodeAddresses = append(nodeAddresses, nodeType.RemainderAddress)
+                                        }
                                 } else {
-                                        log.Warn("Node Status Not Verified - Deferring To Remainder Address", "Node Type", nodeType.Name)
+                                        // Send reward to remainder address if zero nodes exist
+                                        log.Warn("No Active Nodes Found - Deferring to Remainder Address", "Node Type", nodeType.Name)
                                         nodeAddresses = append(nodeAddresses, nodeType.RemainderAddress)
                                 }
-                        } else {
-                                // Send reward to remainder address if zero nodes exist
-                                log.Warn("No Active Nodes Found - Deferring to Remainder Address", "Node Type", nodeType.Name)
-                                nodeAddresses = append(nodeAddresses, nodeType.RemainderAddress)
+
+                                // Save node remainders
+		                nodeRemainder := nodeprotocol.GetNodeRemainder(rewardState, uint64(nodeCount), nodeType.RemainderAddress)
+		                nodeRemainders = append(nodeRemainders, nodeRemainder)
                         }
-
-                        // Save node remainders
-		        nodeRemainder := nodeprotocol.GetNodeRemainder(state, uint64(nodeCount), nodeType.RemainderAddress)
-		        nodeRemainders = append(nodeRemainders, nodeRemainder)
-
+                } else {
+                        log.Error("State Access Error - Reward State Not Found", "Number", rewardHeader.Number.Uint64(), "Reward State Number", rewardStateHeader.Number.Uint64(), "Error", stateErr) 
                 }
         }
-
 	// Accumulate any block and uncle rewards and commit the final state root
 	accumulateRewards(chain.Config(), state, header, uncles, nodeAddresses, nodeRemainders)
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))

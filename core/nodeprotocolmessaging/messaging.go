@@ -16,21 +16,73 @@
 
 package nodeprotocolmessaging
 
+import (
+        "github.com/ethereum/go-ethereum/common"
+        "github.com/ethereum/go-ethereum/core/state"
+)
+
 var pm Manager
+var peerSet PeerSet
+var bc Blockchain
 
 type Manager interface {
         AsyncGetNodeProtocolData(data []string)
+        AsyncSendNodeProtocolData(data []string)
         AsyncGetNodeProtocolSyncData(data []string)
+        AsyncGetNodeProtocolPeerVerification(data []string)
+}
+
+type PeerSet interface {
+        Len() int
+        String() []string
+}
+
+type Blockchain interface {
+        StateAt(hash common.Hash) (*state.StateDB, error)
+}
+
+func SetBlockchain(blockchain Blockchain) {
+        bc = blockchain
+}
+
+func GetStateAt(hash common.Hash) (*state.StateDB, error) {
+        return bc.StateAt(hash)
 }
 
 func SetProtocolManager(manager Manager) {
         pm = manager
 }
 
+func SetPeerSet(ps PeerSet) {
+       peerSet = ps
+}
+
+func CheckPeerSet(id string) bool {
+        for _, peerId := range peerSet.String() {
+                // Return true if peer is found
+                if id == peerId {
+                        return true
+                }
+        }
+        return false
+}
+
+func GetPeerCount() int {
+        return peerSet.Len()
+}
+
 func RequestNodeProtocolData(data []string) {
         pm.AsyncGetNodeProtocolData(data)
 }
 
+func SendNodeProtocolData(data []string) {
+        pm.AsyncSendNodeProtocolData(data)
+}
+
 func RequestNodeProtocolSyncData(data []string) {
         pm.AsyncGetNodeProtocolSyncData(data)
+}
+
+func RequestNodeProtocolPeerVerification(data []string) {
+        pm.AsyncGetNodeProtocolPeerVerification(data)
 }

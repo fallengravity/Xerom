@@ -28,6 +28,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/core/nodeprotocol"
+	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 )
 
 var (
@@ -297,6 +299,11 @@ func (p *peer) SendNodeProtocolSyncData(data [][]string) error {
 	return p2p.Send(p.rw, SendNodeProtocolSyncDataMsg, data)
 }
 
+// SendNodeProtocolPeerVerification verifies a specific peer exists
+func (p *peer) SendNodeProtocolPeerVerification(data []string) error {
+	return p2p.Send(p.rw, SendNodeProtocolPeerVerificationMsg, data)
+}
+
 // SendNodeDataRLP sends a batch of arbitrary internal data, corresponding to the
 // hashes requested.
 func (p *peer) SendNodeData(data [][]byte) error {
@@ -348,6 +355,12 @@ func (p *peer) RequestNodeProtocolData(data []string) error {
 func (p *peer) RequestNodeProtocolSyncData(data []string) error {
 	p.Log().Debug("Requesting Node Protocol Data Sync", "Type", data[0], "Number", data[1], "Count", data[2])
 	return p2p.Send(p.rw, GetNodeProtocolSyncDataMsg, data)
+}
+
+// RequestNodeProtocolPeerVerification requests verification of specific peer
+func (p *peer) RequestNodeProtocolPeerVerification(data []string) error {
+	p.Log().Debug("Requesting Node Protocol Peer Verification", "Type", data[0], "Hash", data[1], "Number", data[2], "Peer", data[3])
+	return p2p.Send(p.rw, GetNodeProtocolPeerVerificationMsg, data)
 }
 
 // RequestNodeData fetches a batch of arbitrary data from a node's known state
@@ -442,9 +455,11 @@ type peerSet struct {
 
 // newPeerSet creates a new peer set to track the active participants.
 func newPeerSet() *peerSet {
-	return &peerSet{
+        ps := &peerSet{
 		peers: make(map[string]*peer),
 	}
+        nodeprotocolmessaging.SetPeerSet(ps)
+        return ps
 }
 
 // Register injects a new peer into the working set, or returns an error if the
@@ -496,6 +511,15 @@ func (ps *peerSet) Len() int {
 	defer ps.lock.RUnlock()
 
 	return len(ps.peers)
+}
+
+// String retrieved a list of all peer ids in string slice
+func (ps *peerSet) String() []string {
+        var peerList []string
+        for _, peer := range ps.Peers() {
+                peerList = append(peerList, nodeprotocol.GetNodeId(peer.Node()))
+        }
+        return peerList
 }
 
 // Peers retrieves a list of all peers in set

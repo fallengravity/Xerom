@@ -20,21 +20,17 @@ import (
 	"math/rand"
 	"sync/atomic"
 	"time"
-        "strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 )
 
 const (
 	forceSyncCycle       = 10 * time.Second // Time interval to force syncs, even if few peers are available
 	minDesiredPeerCount  = 5                // Amount of peers desired to start syncing
-        minRequiredPeerCount = 2                // Amount of peers required to start syncing
 
 	// This is the target size for the packs of transactions sent by txsyncLoop.
 	// A pack can get larger than this if a single transactions exceeds this size.
@@ -156,9 +152,6 @@ func (pm *ProtocolManager) syncer() {
 
 		case <-forceSync.C:
 			// Force a sync even if not enough peers are present
-			if pm.peers.Len() < minRequiredPeerCount {
-                                break
-                        }
 			go pm.synchronise(pm.peers.BestPeer())
 
 		case <-pm.noMorePeers:
@@ -181,28 +174,6 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 	if pTd.Cmp(td) <= 0 {
 		return
 	}
-
-        if currentBlock.Header().Number.Int64() > params.NodeProtocolBlock{
-                for _, nodeType := range params.NodeTypes {
-                        log.Trace("Requesting Node Protocol Sync Data From Peer", "Type", nodeType.Name)
-
-                        // Request previous 200 blocks of data to sync with
-                        startingBlockNumber, _ := nodeprotocol.GetHeadNodeProtocolDataEntry(nodeType.Name)
-                        requestData := []string{nodeType.Name, strconv.FormatUint((startingBlockNumber - 200), 10), strconv.FormatUint(200, 10)}
-                        go peer.RequestNodeProtocolSyncData(requestData)
-
-                        // Send previous 200 blocks of data to sync with
-                        hashData, nodeData, blockData, _ := nodeprotocol.GetNodeProtocolDataGroup(nodeType.Name, (startingBlockNumber - 200), startingBlockNumber)
-                        nodeDataLength := len(nodeData)
-                        hashDataLength := len(hashData)
-                        blockDataLength := len(blockData)
-
-                        if nodeDataLength == hashDataLength && hashDataLength == blockDataLength {
-                                sendData := [][]string{[]string{nodeType.Name}, nodeData, hashData, blockData}
-                                peer.SendNodeProtocolSyncData(sendData)
-                        }
-                }
-        }
 
 	// Otherwise try to sync with the downloader
 	mode := downloader.FullSync

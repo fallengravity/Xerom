@@ -123,7 +123,8 @@ func SetupNodeProtocolMapping() {
 }
 
 // CheckNodeStatus checks to see if specified node has been validated
-func CheckNodeStatus(blockHeight uint64, currentHash common.Hash, parentHash common.Hash, grandParentHash common.Hash, nodeType string, nodeId string, blockHash common.Hash, blockNumber uint64) bool {
+//func CheckNodeStatus(blockHeight uint64, currentHash common.Hash, parentHash common.Hash, grandParentHash common.Hash, nodeType string, nodeId string, blockHash common.Hash, blockNumber uint64) bool {
+func CheckNodeStatus(nodeType string, nodeId string, blockHash common.Hash, blockNumber uint64) bool {
         if len(nodeProtocolData) == 0 {
                 SetupNodeProtocolMapping()
         }

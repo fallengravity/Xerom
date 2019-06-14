@@ -472,13 +472,14 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
                 nodeprotocol.SetTargetSyncNumber(peerHead.Number.Uint64())
                 protocolHeadStateChannel := nodeprotocolmessaging.GetNodeProtocolHeadChannel()
 
+                log.Info("Node Protocol Data Synchronisation In Progress", "Start Block", syncStartBlock, "End Block", peerHead.Number.Uint64())
+
                 if syncBlockCount > 200 {
                         for i := syncStartBlock; i < (syncStartBlock + syncBlockCount); i = i + 200 {
                                 blockCount := uint64(200)
                                 if (i + blockCount) > peerHead.Number.Uint64() {
-                                        //blockCount = peerHead.Number.Uint64() - i
                                 }
-                                log.Info("Node Protocol Data Synchronisation In Progress", "Start Block", i, "End Block", i + blockCount)
+                                log.Trace("Node Protocol Data Synchronisation In Progress", "Start Block", i, "End Block", i + blockCount)
 
                                 for _, nodeType := range params.NodeTypes {
                                         data := []string{nodeType.Name, strconv.FormatUint(i, 10), strconv.FormatUint(uint64(blockCount), 10)}
@@ -489,11 +490,11 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
                                 case msg := <-protocolHeadStateChannel:
                                         // Check to see if we have successfully synced
                                         // node protocol data
-                                        log.Info("Node Protocol Data Synchronised With Local State", "Number", msg)
+                                        log.Info("Node Protocol Data Received From Peer", "Number", msg)
                                 }
                         }
                 } else {
-                        log.Info("Node Protocol Data Synchronisation In Progess", "Start Block", syncStartBlock, "End Block", syncStartBlock + syncBlockCount)
+                        log.Trace("Node Protocol Data Synchronisation In Progess", "Start Block", syncStartBlock, "End Block", syncStartBlock + syncBlockCount)
                         for _, nodeType := range params.NodeTypes {
                                 data := []string{nodeType.Name, strconv.FormatUint(syncStartBlock, 10), strconv.FormatUint(uint64(syncBlockCount), 10)}
                                 go nodeprotocolmessaging.RequestNodeProtocolSyncData(data)
@@ -503,7 +504,7 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
                         case msg := <-protocolHeadStateChannel:
                                 // Check to see if we have successfully synced
                                 // node protocol data
-                                log.Info("Node Protocol Data Synchronised With Local State", "Number", msg)
+                                log.Info("Node Protocol Data Received From Peer", "Number", msg)
                         }
                 }
         }

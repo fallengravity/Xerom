@@ -26,11 +26,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+        "strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
+	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -206,6 +209,10 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	}
 	// Take ownership of this particular state
 	go bc.update()
+
+        // Set blockchain state for node protocol access
+        nodeprotocolmessaging.SetBlockchain(bc)
+
 	return bc, nil
 }
 
@@ -504,6 +511,38 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 //
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) insert(block *types.Block) {
+
+        rewardBlock := bc.GetBlockByNumber(block.NumberU64() - 100)
+        // Check for next node up for reward
+        if nodeprotocol.NodeFlag && rewardBlock != nil  && block.Header().Number.Int64() > params.NodeProtocolBlock {
+                for _, nodeType := range params.NodeTypes {
+                        // Get current state snapshot
+                        state, err := bc.State()
+                        if err == nil {
+                                nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
+                                if nodeCount > 0 {
+                                        // Determine next reward candidate based on statedb
+                                        nodeId, _ := nodeprotocol.GetNodeCandidate(state, rewardBlock.Hash(), nodeCount, nodeType.ContractAddress)
+
+                                        if nodeprotocolmessaging.CheckPeerSet(nodeId) {
+                                                log.Info("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name)
+                                                rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
+                                                var data = []string{nodeType.Name, nodeId, rewardBlock.Hash().String(), rewardBlockNumber}
+                                                peerId := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode().Server().Self())
+                                                go nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, peerId, nodeprotocolmessaging.GetPeerCount(), rewardBlock.Hash(), rewardBlock.NumberU64(), false)
+                                                go nodeprotocolmessaging.SendNodeProtocolData(data)
+                                        } else {
+                                                log.Info("Reward Candidate Not Found in Peerset - Requesting Node Activity Data", "Type", nodeType.Name)
+                                                rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
+                                                var data = []string{nodeType.Name, rewardBlock.Hash().String(), rewardBlockNumber}
+                                                go nodeprotocolmessaging.RequestNodeProtocolData(data)
+                                                peerData := []string{nodeType.Name, rewardBlock.Hash().String(), rewardBlockNumber, nodeId}
+                                                go nodeprotocolmessaging.RequestNodeProtocolPeerVerification(peerData)
+                                        }
+                                }
+                        }
+                }
+        }
 
 	// If the block is on a side chain or an unknown one, force other heads onto it too
 	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()
