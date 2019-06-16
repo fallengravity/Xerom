@@ -17,6 +17,8 @@
 package nodeprotocolmessaging
 
 import (
+        "sync"
+
         "github.com/ethereum/go-ethereum/common"
         "github.com/ethereum/go-ethereum/core/state"
 )
@@ -24,6 +26,7 @@ import (
 var pm Manager
 var peerSet PeerSet
 var bc Blockchain
+var SyncWg sync.WaitGroup
 
 type Manager interface {
         AsyncGetNodeProtocolData(data []string)

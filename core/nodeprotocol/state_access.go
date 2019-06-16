@@ -19,6 +19,7 @@ package nodeprotocol
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -115,4 +116,38 @@ func getNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 	contractNodeAddress := common.BytesToAddress(responseNodeAddress.Bytes())
 
 	return contractNodeId, contractNodeAddress
+}
+
+func UpdateNodeCount(state *state.StateDB, currentNodeCount int64, countAddresses []common.Address) uint64 {
+
+        var nodeCount = common.BytesToAddress(state.GetCode(countAddresses[len(countAddresses)-1])).Big().Uint64()
+
+        // Rotate addresses for caching behavior
+        for i := len(countAddresses)-1; i > 0; i-- {
+                state.SetCode(countAddresses[i], state.GetCode(countAddresses[i-1]))
+        }
+        currentNodeCountBytes := big.NewInt(currentNodeCount).Bytes()
+        state.SetCode(countAddresses[0], currentNodeCountBytes)
+
+        log.Info("Updating Node Counts", "Count", nodeCount)
+
+        return nodeCount
+}
+
+func UpdateNodeCandidate(state *state.StateDB, currentNodeId string, currentNodeAddress common.Address, nodeIds []common.Address, nodeAddresses []common.Address) (common.Hash, common.Address) {
+
+        var nodeId = common.BytesToHash(state.GetCode(nodeIds[len(nodeIds)-1]))
+        var rewardAddress = common.BytesToAddress(state.GetCode(nodeAddresses[len(nodeAddresses)-1]))
+
+        // Rotate addresses for caching behavior
+        for i := len(nodeIds)-1; i > 0; i-- {
+                state.SetCode(nodeIds[i], state.GetCode(nodeIds[i-1]))
+                state.SetCode(nodeAddresses[i], state.GetCode(nodeAddresses[i-1]))
+        }
+        state.SetCode(nodeIds[0], []byte(currentNodeId))
+        state.SetCode(nodeAddresses[0], currentNodeAddress.Bytes())
+
+        log.Info("Updating Node Reward Candidates", "ID", nodeId, "Address", rewardAddress)
+
+        return nodeId, rewardAddress
 }

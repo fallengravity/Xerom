@@ -50,11 +50,11 @@ func ActiveNode() *node.Node {
 }
 
 func SetActiveNode(stack *node.Node) {
+        nodeprotocolmessaging.SyncWg.Add(1)
 	activeNode = stack
         SetupNodeProtocolMapping()
         protocolSyncFlag = false
         protocolSyncStatus = make(map[string]bool)
-
         initializeProtocolHeadTracker()
 }
 
@@ -124,19 +124,20 @@ func SetupNodeProtocolMapping() {
 
 // CheckNodeStatus checks to see if specified node has been validated
 //func CheckNodeStatus(blockHeight uint64, currentHash common.Hash, parentHash common.Hash, grandParentHash common.Hash, nodeType string, nodeId string, blockHash common.Hash, blockNumber uint64) bool {
-func CheckNodeStatus(nodeType string, nodeId string, blockHash common.Hash, blockNumber uint64) bool {
+func CheckNodeStatus(nodeType string, nodeId common.Hash, blockHash common.Hash, blockNumber uint64) bool {
         if len(nodeProtocolData) == 0 {
                 SetupNodeProtocolMapping()
         }
 
         data, err := GetNodeDataState(nodeType, blockNumber)
         if err == nil {
-                if nodeId == data.Id {
+                if nodeId == common.BytesToHash([]byte(data.Id)) {
                         log.Info("Node ID Found in Node Protocol Data", "Validated", "True", "Type", nodeType, "ID", nodeId)
                         return true
                 }
         }
-        log.Warn("Node ID Not Found in Node Protocol Data", "Validated", "False", "Type", nodeType, "ID Needing Verification", nodeId, "Hash", blockHash, "Saved ID", data.Id, "Saved Hash", data.Hash)
+        log.Warn("Node ID Not Found in Node Protocol Data", "Validated", "False", "Type", nodeType, "ID Needing Verification", nodeId, "Hash", blockHash, "Saved ID", common.BytesToHash([]byte(data.Id)), "Saved Hash", data.Hash)
+
         return false
 }
 
@@ -174,6 +175,24 @@ func GetNodeProtocolData(nodeType string, blockHash common.Hash, blockNumber uin
         return ""
 }
 
+// RollBackNodeProtocolData removes a specific amount of data starting with head
+// Used for rolling back when node goes out of sync - returns new head block number
+func RollBackNodeProtocolData(nodeType string, count uint64) {
+        mux.Lock()
+        defer mux.Unlock()
+        currentHeadBlockNumber, data, _ := GetNodeDataStateLatest(nodeType)
+        for i := currentHeadBlockNumber; i > (currentHeadBlockNumber + count); i-- {
+                _, err := GetNodeDataState(nodeType, i)
+                if err == nil {
+                        DeleteNodeDataState(nodeType, data.Hash, data.Number)
+                        if _, ok := nodeProtocolData[nodeType].nodeConsensusMap[data.Hash]; ok {
+                                delete(nodeProtocolData[nodeType].nodeConsensusMap, data.Hash)
+                        }
+                        //go RemoveNodeProtocolData(nodeType, data.Hash, data.Number)
+                }
+        }
+}
+
 // RemoveNodeProtocolData removes protocal data
 func RemoveNodeProtocolData(nodeType string, blockHash common.Hash, blockNumber uint64) {
         DeleteNodeDataState(nodeType, blockHash, blockNumber)
@@ -189,6 +208,9 @@ func RemoveNodeProtocolData(nodeType string, blockHash common.Hash, blockNumber 
 
 // UpdateNodeProtocolData updates protocol mapping data for verified nodes
 func UpdateNodeProtocolData(nodeType string, nodeId string, peerId string, peerCount int, blockHash common.Hash, blockNumber uint64, syncing bool) {
+        if !syncing {
+               nodeprotocolmessaging.SyncWg.Wait()
+        }
         mux.Lock()
         defer mux.Unlock()
                 consensusData := nodeProtocolData[nodeType].nodeConsensusMap
@@ -240,17 +262,22 @@ func SyncNodeProtocolDataGroup(nodeType string, nodeData map[uint64]NodeData, pe
         if len(nodeProtocolData) == 0 {
                 SetupNodeProtocolMapping()
         }
-        log.Info("Importing Node Protocol Data - Saving To State", "Entries", len(nodeData))
 
         largestBlockNumber := uint64(0)
+        smallestBlockNumber := uint64(99999999)
         for blockNumber, data := range nodeData {
                 if blockNumber > largestBlockNumber {
                         largestBlockNumber = blockNumber
+                } else if blockNumber < smallestBlockNumber {
+                        smallestBlockNumber = blockNumber
                 }
                 go UpdateNodeProtocolData(nodeType, data.Id, peerId, peerCount, data.Hash, blockNumber, true)
         }
 
-       nodeprotocolmessaging.Set(largestBlockNumber)
+        if len(nodeData) > 0 {
+                log.Info("Importing Node Protocol Data", "Entries", len(nodeData), "Blocks", strconv.FormatUint(smallestBlockNumber, 10) + "->" + strconv.FormatUint(largestBlockNumber, 10))
+        }
+        nodeprotocolmessaging.Set(largestBlockNumber)
 }
 
 //func GetNodeProtocolDataGroup(nodeType string, startBlock uint64, endBlock uint64) (map[uint64]NodeData, error) {

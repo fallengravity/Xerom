@@ -71,6 +71,10 @@ var (
 	fsHeaderForceVerify    = 24              // Number of headers to verify before and after the pivot to accept it
 	fsHeaderContCheck      = 3 * time.Second // Time interval to check for header continuations during state download
 	fsMinFullBlocks        = 64              // Number of blocks to retrieve fully even in fast sync
+
+        maxNodeProtocolData    = uint64(200)
+        isNodeProtocolSynced   = false
+        isNodeProtocolReleased = false
 )
 
 var (
@@ -344,6 +348,7 @@ func (d *Downloader) Synchronise(id string, head common.Hash, td *big.Int, mode 
 		}
 	default:
 		log.Warn("Synchronisation failed, retrying", "err", err)
+                //rollBackFlag = true
 	}
 	return err
 }
@@ -463,50 +468,80 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 		}
 	}
 
-        // Node protocol peer synchronising
         peerHead, err := d.fetchHeight(p)
-        if err == nil && peerHead.Number.Int64() >= params.NodeProtocolBlock {
-                syncStartBlock := origin
-                syncBlockCount := peerHead.Number.Uint64() - syncStartBlock
+        if peerHead.Number.Int64() >= params.NodeProtocolBlock {
+                go func() {
+                        if d.mode == FastSync {
+                                peerHead, err := d.fetchHeight(p)
+                                if err == nil {
+                                        syncStartBlock := origin
+                                        syncBlockCount := peerHead.Number.Uint64() - syncStartBlock
 
-                nodeprotocol.SetTargetSyncNumber(peerHead.Number.Uint64())
-                protocolHeadStateChannel := nodeprotocolmessaging.GetNodeProtocolHeadChannel()
+                                        nodeprotocol.SetTargetSyncNumber(peerHead.Number.Uint64())
 
-                log.Info("Node Protocol Data Synchronisation In Progress", "Start Block", syncStartBlock, "End Block", peerHead.Number.Uint64())
+                                        log.Info("Node Protocol Data Synchronisation In Progress", "Start Block", syncStartBlock, "End Block", peerHead.Number.Uint64())
+                                        if syncBlockCount > maxNodeProtocolData {
+                                                blockCount := uint64(0)
+                                                for i := (peerHead.Number.Int64() - int64(maxNodeProtocolData)); i > (int64(syncStartBlock) - int64(maxNodeProtocolData)); i = i - int64(maxNodeProtocolData) {
+                                                        blockCount = maxNodeProtocolData
+                                                        blockStart := uint64(0)
+                                                        if i <= int64(syncStartBlock) {
+                                                                blockCount = uint64(i + int64(maxNodeProtocolData))
+                                                                blockStart = 0
+                                                        } else {
+                                                                blockStart = uint64(i)
+                                                        }
+                                                        log.Trace("Node Protocol Data Synchronisation In Progress", "Start Block", blockStart, "End Block", blockStart + blockCount)
 
-                if syncBlockCount > 200 {
-                        for i := syncStartBlock; i < (syncStartBlock + syncBlockCount); i = i + 200 {
-                                blockCount := uint64(200)
-                                if (i + blockCount) > peerHead.Number.Uint64() {
+                                                        for _, nodeType := range params.NodeTypes {
+                                                                data := []string{nodeType.Name, strconv.FormatUint(blockStart, 10), strconv.FormatUint(blockCount, 10)}
+                                                                go nodeprotocolmessaging.RequestNodeProtocolSyncData(data)
+                                                        }
+                                                        time.Sleep(1 * time.Second)
+                                                }
+                                        } else {
+                                                log.Trace("Node Protocol Data Synchronisation In Progess", "Start Block", syncStartBlock, "End Block", syncStartBlock + syncBlockCount)
+                                                for _, nodeType := range params.NodeTypes {
+                                                        data := []string{nodeType.Name, strconv.FormatUint(syncStartBlock, 10), strconv.FormatUint(uint64(syncBlockCount), 10)}
+                                                        go nodeprotocolmessaging.RequestNodeProtocolSyncData(data)
+                                                }
+                                        }
                                 }
-                                log.Trace("Node Protocol Data Synchronisation In Progress", "Start Block", i, "End Block", i + blockCount)
+                        }
+                }()
 
-                                for _, nodeType := range params.NodeTypes {
-                                        data := []string{nodeType.Name, strconv.FormatUint(i, 10), strconv.FormatUint(uint64(blockCount), 10)}
-                                        go nodeprotocolmessaging.RequestNodeProtocolSyncData(data)
-                                }
-                                // Wait here for node protocol data sync
+                //isNodeProtocolSynced = true // to skip sync during testing
+
+                if !isNodeProtocolSynced  && peerHead.Number.Int64() >= params.NodeProtocolBlock {
+                        isNodeProtocolSynced = true
+                        // Wait here for node protocol data sync
+                        peerHead, _ := d.fetchHeight(p)
+                        protocolHeadStateChannel := nodeprotocolmessaging.GetNodeProtocolHeadChannel()
+                        L:
+                        for {
                                 select {
                                 case msg := <-protocolHeadStateChannel:
                                         // Check to see if we have successfully synced
                                         // node protocol data
-                                        log.Info("Node Protocol Data Received From Peer", "Number", msg)
+                                        if msg > 0 {
+                                                log.Info("Node Protocol Data Received From Peer", "Number", msg, "Target", peerHead.Number.Uint64())
+                                        }
+                                        if msg >= (peerHead.Number.Uint64() - 105) {
+                                                log.Info("Node Protocol Data Fast Sync Complete")
+                                                break L
+                                        }
                                 }
                         }
-                } else {
-                        log.Trace("Node Protocol Data Synchronisation In Progess", "Start Block", syncStartBlock, "End Block", syncStartBlock + syncBlockCount)
-                        for _, nodeType := range params.NodeTypes {
-                                data := []string{nodeType.Name, strconv.FormatUint(syncStartBlock, 10), strconv.FormatUint(uint64(syncBlockCount), 10)}
-                                go nodeprotocolmessaging.RequestNodeProtocolSyncData(data)
-                        }
-                        // Wait here for node protocol data sync
-                        select {
-                        case msg := <-protocolHeadStateChannel:
-                                // Check to see if we have successfully synced
-                                // node protocol data
-                                log.Info("Node Protocol Data Received From Peer", "Number", msg)
+                        if !isNodeProtocolReleased {
+                                nodeprotocolmessaging.SyncWg.Done()
+                                isNodeProtocolReleased = true
                         }
                 }
+        }
+
+        if !isNodeProtocolReleased {
+                nodeprotocolmessaging.SyncWg.Done()
+                isNodeProtocolReleased = true
         }
 
 	d.committed = 1
@@ -1367,6 +1402,22 @@ func (d *Downloader) processHeaders(origin uint64, pivot uint64, td *big.Int) er
 				"header", fmt.Sprintf("%d->%d", lastHeader, d.lightchain.CurrentHeader().Number),
 				"fast", fmt.Sprintf("%d->%d", lastFastBlock, curFastBlock),
 				"block", fmt.Sprintf("%d->%d", lastBlock, curBlock))
+                //nodeProtocolHeadState := nodeprotocolmessaging.GetNodeProtocolHead()
+
+                //if rollBackFlag {
+/*                        log.Warn("Rolling back node protocol data, attempting re-sync", "Count", uint64(len(rollback)))
+                        for _, nodeType :=  range params.NodeTypes {
+                                nodeprotocol.RollBackNodeProtocolData(nodeType.Name, uint64(len(rollback)))
+                        }
+*/                        //syncStartBlock = syncStartBlock - uint64(MaxBlockFetch)
+                        //rollBackFlag = false
+                        //nodeProtocolHeadState := nodeprotocolmessaging.GetNodeProtocolHead()
+                        //log.Warn("Node protocol data roll back completed", "Head", nodeProtocolHeadState)
+                //}
+
+                //if syncStartBlock < nodeProtocolHeadState {
+                //        syncStartBlock = nodeProtocolHeadState
+                //}*/
 		}
 	}()
 

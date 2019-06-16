@@ -30,10 +30,10 @@ var NodeTypes = []NodeType{
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
                 RewardSplit:        big.NewInt(10), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000001"),
-		AddressLocation:    common.HexToAddress("0x0000000000000000000000000000000000000005"),
-		NodeCountLocation:  common.HexToAddress("0x0000000000000000000000000000000000000011"),
-		RemainderLocation:  common.HexToAddress("0x0000000000000000000000000000000000000012"),
 		ContractAddress:    common.HexToAddress("0x3717AD55666577Eb92fCa3e5F9F71958bD60c620"),
+                CountCachingAddresses:       []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000014"), common.HexToAddress("0x0000000000000000000000000000000000000013"), common.HexToAddress("0x0000000000000000000000000000000000000012"), common.HexToAddress("0x0000000000000000000000000000000000000011"), common.HexToAddress("0x0000000000000000000000000000000000000010")},
+                NodeIdCachingAddresses:      []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000114"), common.HexToAddress("0x0000000000000000000000000000000000000113"), common.HexToAddress("0x0000000000000000000000000000000000000112"), common.HexToAddress("0x0000000000000000000000000000000000000111"), common.HexToAddress("0x0000000000000000000000000000000000000110")},
+                NodeAddressCachingAddresses: []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000214"), common.HexToAddress("0x0000000000000000000000000000000000000213"), common.HexToAddress("0x0000000000000000000000000000000000000212"), common.HexToAddress("0x0000000000000000000000000000000000000211"), common.HexToAddress("0x0000000000000000000000000000000000000210")},
 	},
 	NodeType{
 		Name:               "Xero Node",
@@ -41,10 +41,10 @@ var NodeTypes = []NodeType{
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
                 RewardSplit:        big.NewInt(20), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000002"),
-		AddressLocation:    common.HexToAddress("0x0000000000000000000000000000000000000006"),
-		NodeCountLocation:  common.HexToAddress("0x0000000000000000000000000000000000000013"),
-		RemainderLocation:  common.HexToAddress("0x0000000000000000000000000000000000000014"),
 		ContractAddress:    common.HexToAddress("0xc46Cc53b8F09fe6F4eB6b6dF8AD5c6Fe5DA6638B"),
+                CountCachingAddresses:       []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000024"), common.HexToAddress("0x0000000000000000000000000000000000000023"), common.HexToAddress("0x0000000000000000000000000000000000000022"), common.HexToAddress("0x0000000000000000000000000000000000000021"), common.HexToAddress("0x0000000000000000000000000000000000000020")},
+                NodeIdCachingAddresses:      []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000124"), common.HexToAddress("0x0000000000000000000000000000000000000123"), common.HexToAddress("0x0000000000000000000000000000000000000122"), common.HexToAddress("0x0000000000000000000000000000000000000121"), common.HexToAddress("0x0000000000000000000000000000000000000120")},
+                NodeAddressCachingAddresses: []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000224"), common.HexToAddress("0x0000000000000000000000000000000000000223"), common.HexToAddress("0x0000000000000000000000000000000000000222"), common.HexToAddress("0x0000000000000000000000000000000000000221"), common.HexToAddress("0x0000000000000000000000000000000000000220")},
 	},
 	NodeType{
 		Name:               "Link Node",
@@ -52,10 +52,10 @@ var NodeTypes = []NodeType{
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
                 RewardSplit:        big.NewInt(30), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000003"),
-		AddressLocation:    common.HexToAddress("0x0000000000000000000000000000000000000007"),
-		NodeCountLocation:  common.HexToAddress("0x0000000000000000000000000000000000000015"),
-		RemainderLocation:  common.HexToAddress("0x0000000000000000000000000000000000000016"),
 		ContractAddress:    common.HexToAddress("0xE44389C26FDEb581dEa7Df91Efd0665a7cd404c1"),
+                CountCachingAddresses:       []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000034"), common.HexToAddress("0x0000000000000000000000000000000000000033"), common.HexToAddress("0x0000000000000000000000000000000000000032"), common.HexToAddress("0x0000000000000000000000000000000000000031"), common.HexToAddress("0x0000000000000000000000000000000000000030")},
+                NodeIdCachingAddresses:      []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000134"), common.HexToAddress("0x0000000000000000000000000000000000000133"), common.HexToAddress("0x0000000000000000000000000000000000000132"), common.HexToAddress("0x0000000000000000000000000000000000000131"), common.HexToAddress("0x0000000000000000000000000000000000000130")},
+                NodeAddressCachingAddresses: []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000234"), common.HexToAddress("0x0000000000000000000000000000000000000233"), common.HexToAddress("0x0000000000000000000000000000000000000232"), common.HexToAddress("0x0000000000000000000000000000000000000231"), common.HexToAddress("0x0000000000000000000000000000000000000230")},
 	},
 	NodeType{
 		Name:               "Super Node",
@@ -63,10 +63,10 @@ var NodeTypes = []NodeType{
 		BlockReward:        big.NewInt(0), //Initialize to 0 since we are using monetary policy config during consensus
                 RewardSplit:        big.NewInt(40), //Declare split - ie 10 is 10%
 		RemainderAddress:   common.HexToAddress("0x0000000000000000000000000000000000000004"),
-		AddressLocation:    common.HexToAddress("0x0000000000000000000000000000000000000008"),
-		NodeCountLocation:  common.HexToAddress("0x0000000000000000000000000000000000000017"),
-		RemainderLocation:  common.HexToAddress("0x0000000000000000000000000000000000000018"),
 		ContractAddress:    common.HexToAddress("0x93B7a5c74793DCba765a1dD163e1744622306651"),
+                CountCachingAddresses:       []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000044"), common.HexToAddress("0x0000000000000000000000000000000000000043"), common.HexToAddress("0x0000000000000000000000000000000000000042"), common.HexToAddress("0x0000000000000000000000000000000000000041"), common.HexToAddress("0x0000000000000000000000000000000000000040")},
+                NodeIdCachingAddresses:      []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000144"), common.HexToAddress("0x0000000000000000000000000000000000000143"), common.HexToAddress("0x0000000000000000000000000000000000000142"), common.HexToAddress("0x0000000000000000000000000000000000000141"), common.HexToAddress("0x0000000000000000000000000000000000000140")},
+                NodeAddressCachingAddresses: []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000244"), common.HexToAddress("0x0000000000000000000000000000000000000243"), common.HexToAddress("0x0000000000000000000000000000000000000242"), common.HexToAddress("0x0000000000000000000000000000000000000241"), common.HexToAddress("0x0000000000000000000000000000000000000240")},
 	},
 }
 
@@ -90,7 +90,7 @@ var TrustedCheckpoints = map[common.Hash]*TrustedCheckpoint{
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(1313122),
+		ChainID:             big.NewInt(1313123),
 		HomesteadBlock:      big.NewInt(0),
 		DAOForkBlock:        nil,
 		DAOForkSupport:      true,
@@ -219,10 +219,10 @@ type NodeType struct {
 	BlockReward        *big.Int
 	RewardSplit        *big.Int
 	RemainderAddress   common.Address
-        AddressLocation    common.Address
-        NodeCountLocation  common.Address
-        RemainderLocation  common.Address
 	ContractAddress    common.Address
+        CountCachingAddresses       []common.Address
+        NodeIdCachingAddresses      []common.Address
+        NodeAddressCachingAddresses []common.Address
 }
 
 // TrustedCheckpoint represents a set of post-processed trie roots (CHT and

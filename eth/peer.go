@@ -42,6 +42,7 @@ const (
 	maxKnownTxs      = 32768 // Maximum transactions hashes to keep in the known list (prevent DOS)
 	maxKnownBlocks   = 1024  // Maximum block hashes to keep in the known list (prevent DOS)
         maxKnownNodeData = 1024  // Maximum node data to keep in known list (prevent DOS)
+        maxKnownNodeDataMessages = 1024  // Maximum node data message records to keep in known list (prevent DOS)
 
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
@@ -90,7 +91,8 @@ type peer struct {
 
 	knownTxs      mapset.Set                // Set of transaction hashes known to be known by this peer
 	knownBlocks   mapset.Set                // Set of block hashes known to be known by this peer
-        knownNodeData mapset.Set
+        knownNodeData        mapset.Set
+        knownNodeDataMessage mapset.Set
 	queuedTxs   chan []*types.Transaction // Queue of transactions to broadcast to the peer
 	queuedProps chan *propEvent           // Queue of blocks to broadcast to the peer
 	queuedAnns  chan *types.Block         // Queue of blocks to announce to the peer
@@ -105,7 +107,8 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 		id:            fmt.Sprintf("%x", p.ID().Bytes()[:8]),
 		knownTxs:      mapset.NewSet(),
 		knownBlocks:   mapset.NewSet(),
-		knownNodeData: mapset.NewSet(),
+		knownNodeData:        mapset.NewSet(),
+		knownNodeDataMessage: mapset.NewSet(),
 		queuedTxs:   make(chan []*types.Transaction, maxQueuedTxs),
 		queuedProps: make(chan *propEvent, maxQueuedProps),
 		queuedAnns:  make(chan *types.Block, maxQueuedAnns),
@@ -206,6 +209,15 @@ func (p *peer) MarkNodeData(number uint64) {
 		p.knownNodeData.Pop()
 	}
 	p.knownNodeData.Add(number)
+}
+
+// MarkNodeDataMessage marks a NodeDataMessage as known for the peer
+func (p *peer) MarkNodeDataMessage(peerId string) {
+	// If we reached the memory allowance, drop a previously known block hash
+	for p.knownNodeDataMessage.Cardinality() >= maxKnownNodeDataMessages {
+		p.knownNodeDataMessage.Pop()
+	}
+	p.knownNodeDataMessage.Add(peerId)
 }
 
 // SendTransactions sends transactions to the peer and includes the hashes
@@ -577,6 +589,18 @@ func (ps *peerSet) PeersWithoutNodeData(number uint64) []*peer {
 		}
 	}
 	return list
+}
+
+// CheckPeerWithoutNodeDataMessage retrieves a list of peers that do not have a given NodeData in
+// their set of known data.
+func (ps *peerSet) CheckPeerWithoutNodeDataMessage(peerId string, p *peer) bool {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+        if !p.knownNodeDataMessage.Contains(peerId) {
+			return true
+	}
+	return false
 }
 
 // BestPeer retrieves the known peer with the currently highest total difficulty.

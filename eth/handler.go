@@ -360,27 +360,31 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         return errResp(ErrDecode, "msg %v: %v", msg, err)
                 }
                 if len(nodeProtocolData) == 4 {
-                        go func() {
-                                for _, peer := range pm.peers.peers {
-                                        id := nodeprotocol.GetNodeId(peer.Node())
-                                        if id == nodeProtocolData[3] {
-                                                data := []string{nodeProtocolData[0], nodeProtocolData[1], nodeProtocolData[2], nodeProtocolData[3], "true"}
-                                                p.SendNodeProtocolPeerVerification(data)
-                                                return
+                        if pm.peers.CheckPeerWithoutNodeDataMessage(nodeProtocolData[3], p) {
+                                p.MarkNodeDataMessage(nodeProtocolData[3])
+                                go func() {
+                                        log.Trace("Receieved Peer Verification Message", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[1], "Number", nodeProtocolData[2], "ID", nodeProtocolData[3])
+                                        for _, peer := range pm.peers.peers {
+                                                id := nodeprotocol.GetNodeId(peer.Node())
+                                                if id == nodeProtocolData[3] {
+                                                        data := []string{nodeProtocolData[0], nodeProtocolData[1], nodeProtocolData[2], nodeProtocolData[3], "true"}
+                                                        p.SendNodeProtocolPeerVerification(data)
+                                                        return
+                                                }
                                         }
-                                }
-                                blockNumber,_ := strconv.ParseUint(nodeProtocolData[2], 10, 64)
-                                if nodeprotocol.CheckUpToDate(nodeProtocolData[0], common.HexToHash(nodeProtocolData[1]), blockNumber) {
-                                        nodeId := nodeprotocol.GetNodeProtocolData(nodeProtocolData[0], common.HexToHash(nodeProtocolData[1]), blockNumber)
-                                        if nodeId == nodeProtocolData[3] {
-                                                data := []string{nodeProtocolData[0], nodeProtocolData[1], nodeProtocolData[2], nodeProtocolData[3], "true"}
-                                                p.SendNodeProtocolPeerVerification(data)
-                                                return
+                                        blockNumber,_ := strconv.ParseUint(nodeProtocolData[2], 10, 64)
+                                        if nodeprotocol.CheckUpToDate(nodeProtocolData[0], common.HexToHash(nodeProtocolData[1]), blockNumber) {
+                                                nodeId := nodeprotocol.GetNodeProtocolData(nodeProtocolData[0], common.HexToHash(nodeProtocolData[1]), blockNumber)
+                                                if nodeId == nodeProtocolData[3] {
+                                                        data := []string{nodeProtocolData[0], nodeProtocolData[1], nodeProtocolData[2], nodeProtocolData[3], "true"}
+                                                        p.SendNodeProtocolPeerVerification(data)
+                                                        return
+                                                }
                                         }
-                                }
-                                // If peer was not in peerset & not in database request verification
-                                go pm.AsyncGetNodeProtocolPeerVerification(nodeProtocolData)
-                        }()
+                                        // If peer was not in peerset & not in database request verification
+                                        go pm.AsyncGetNodeProtocolPeerVerification(nodeProtocolData)
+                                }()
+                        }
                 }
 
 	case msg.Code == SendNodeProtocolPeerVerificationMsg:
@@ -389,6 +393,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         return errResp(ErrDecode, "msg %v: %v", msg, err)
                 }
                 if len(nodeProtocolData) == 5 && nodeProtocolData[4] == "true" {
+                        log.Trace("Sending Peer Verification Message", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[1], "Number", nodeProtocolData[2], "ID", nodeProtocolData[3])
                         peerId := nodeprotocol.GetNodeId(p.Node())
                         blockNumber,_ := strconv.ParseUint(nodeProtocolData[2], 10, 64)
                         go nodeprotocol.UpdateNodeProtocolData(nodeProtocolData[0], nodeProtocolData[3], peerId, len(pm.peers.peers), common.HexToHash(nodeProtocolData[1]), blockNumber, false)
@@ -457,6 +462,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
                 if len(nodeProtocolData) == 3 {
+                        log.Trace("Receieved Node Protocol Data Request Message", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[1], "Number", nodeProtocolData[2])
                         // Check if we have updated node protocol data
                         blockNumber,_ := strconv.ParseUint(nodeProtocolData[2], 10, 64)
                         if nodeprotocol.CheckUpToDate(nodeProtocolData[0], common.HexToHash(nodeProtocolData[1]), blockNumber) {
@@ -478,7 +484,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                 if len(nodeProtocolData) != 4 {
                         log.Error("Incorrectly Formatted Node Protocol Data Message Received")
                 } else {
-
+                        log.Trace("Receieved Node Protocol Data Message", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[2], "Number", nodeProtocolData[3], "ID", nodeProtocolData[1])
 	                // Check if we have updated node protocol data
                         blockNumber,_ := strconv.ParseUint(nodeProtocolData[3], 10, 64)
           	        if !nodeprotocol.CheckUpToDate(nodeProtocolData[0], common.HexToHash(nodeProtocolData[2]), blockNumber) {
@@ -902,21 +908,29 @@ func (pm *ProtocolManager) AsyncSendNodeProtocolData(data []string) {
 }
 
 func (pm *ProtocolManager) AsyncGetNodeProtocolPeerVerification(data []string) {
-        for _, peer := range pm.peers.peers {
+	peers := pm.peers.Peers()
+        // Send the block to a subset of our peers
+        transferLen := int(math.Sqrt(float64(len(peers))))
+        if transferLen < minBroadcastPeers {
+                transferLen = minBroadcastPeers
+        }
+        if transferLen > len(peers) {
+                transferLen = len(peers)
+        }
+        transfer := peers[:transferLen]
+        for _, peer := range transfer {
 		peer.RequestNodeProtocolPeerVerification(data)
 	}
 }
 
 func (pm *ProtocolManager) AsyncGetNodeProtocolData(data []string) {
-        for _, peer := range pm.peers.peers {
-		peer.RequestNodeProtocolData(data)
-	}
+        peer := pm.peers.BestPeer()
+        peer.RequestNodeProtocolData(data)
 }
 
 func (pm *ProtocolManager) AsyncGetNodeProtocolSyncData(data []string) {
-        for _, peer := range pm.peers.peers {
-	        peer.RequestNodeProtocolSyncData(data)
-        }
+        peer := pm.peers.BestPeer()
+        peer.RequestNodeProtocolSyncData(data)
 }
 
 // BroadcastTxs will propagate a batch of transactions to all peers which are not known to
