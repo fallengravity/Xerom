@@ -522,23 +522,26 @@ func (bc *BlockChain) insert(block *types.Block) {
                                 nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
                                 if nodeCount > 0 {
                                         // Determine next reward candidate based on statedb
-                                        nodeId, _ := nodeprotocol.GetNodeCandidate(state, rewardBlock.Hash(), nodeCount, nodeType.ContractAddress)
+                                        nodeId, nodeIp, _ := nodeprotocol.GetNodeCandidate(state, rewardBlock.Hash(), nodeCount, nodeType.ContractAddress)
+                                        rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
 
-                                        if nodeprotocolmessaging.CheckPeerSet(nodeId) {
-                                                log.Info("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name)
-                                                rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
-                                                var data = []string{nodeType.Name, nodeId, rewardBlock.Hash().String(), rewardBlockNumber}
+                                        if nodeprotocolmessaging.CheckPeerSet(nodeId, nodeIp) {
+                                                log.Info("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name, "ID", nodeId, "IP", nodeIp)
+                                                var data = []string{nodeType.Name, nodeId, nodeIp, rewardBlock.Hash().String(), rewardBlockNumber}
                                                 peerId := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode().Server().Self())
-                                                go nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, peerId, nodeprotocolmessaging.GetPeerCount(), rewardBlock.Hash(), rewardBlock.NumberU64(), false)
+                                                go nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, nodeIp, peerId, nodeprotocolmessaging.GetPeerCount(), rewardBlock.Hash(), rewardBlock.NumberU64(), false)
                                                 go nodeprotocolmessaging.SendNodeProtocolData(data)
                                         } else {
                                                 log.Info("Reward Candidate Not Found in Peerset - Requesting Node Activity Data", "Type", nodeType.Name)
-                                                rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
                                                 var data = []string{nodeType.Name, rewardBlock.Hash().String(), rewardBlockNumber}
                                                 go nodeprotocolmessaging.RequestNodeProtocolData(data)
                                                 peerData := []string{nodeType.Name, rewardBlock.Hash().String(), rewardBlockNumber, nodeId}
                                                 go nodeprotocolmessaging.RequestNodeProtocolPeerVerification(peerData)
                                         }
+                                        // Request previous data as redundancy
+                                        //rewardParentBlockNumber := strconv.FormatUint(rewardBlock.NumberU64()-1, 10)
+                                        //var data = []string{nodeType.Name, rewardBlock.ParentHash().String(), rewardParentBlockNumber}
+                                        //go nodeprotocolmessaging.RequestNodeProtocolData(data)
                                 }
                         }
                 }

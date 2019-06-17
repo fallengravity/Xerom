@@ -38,6 +38,7 @@ type Manager interface {
 type PeerSet interface {
         Len() int
         String() []string
+        Ips() map[string]string
 }
 
 type Blockchain interface {
@@ -60,11 +61,14 @@ func SetPeerSet(ps PeerSet) {
        peerSet = ps
 }
 
-func CheckPeerSet(id string) bool {
+func CheckPeerSet(id string, ip string) bool {
+        ipMap := peerSet.Ips()
         for _, peerId := range peerSet.String() {
-                // Return true if peer is found
-                if id == peerId {
-                        return true
+                if peerIp, ok := ipMap[peerId]; ok {
+                        // Return true if peer is found
+                        if id == peerId && ip == peerIp {
+                                return true
+                        }
                 }
         }
         return false

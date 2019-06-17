@@ -23,6 +23,7 @@ import (
         "net/url"
         "net"
         "sync"
+        "errors"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
@@ -124,19 +125,19 @@ func SetupNodeProtocolMapping() {
 
 // CheckNodeStatus checks to see if specified node has been validated
 //func CheckNodeStatus(blockHeight uint64, currentHash common.Hash, parentHash common.Hash, grandParentHash common.Hash, nodeType string, nodeId string, blockHash common.Hash, blockNumber uint64) bool {
-func CheckNodeStatus(nodeType string, nodeId common.Hash, blockHash common.Hash, blockNumber uint64) bool {
+func CheckNodeStatus(nodeType string, nodeId common.Hash, nodeIp common.Hash, blockHash common.Hash, blockNumber uint64) bool {
         if len(nodeProtocolData) == 0 {
                 SetupNodeProtocolMapping()
         }
 
         data, err := GetNodeDataState(nodeType, blockNumber)
         if err == nil {
-                if nodeId == common.BytesToHash([]byte(data.Id)) {
-                        log.Info("Node ID Found in Node Protocol Data", "Validated", "True", "Type", nodeType, "ID", nodeId)
+                if nodeId == common.BytesToHash([]byte(data.Id)) && nodeIp == common.BytesToHash([]byte(data.Ip)) {
+                        log.Info("Node ID Found in Node Protocol Data", "Validated", "True", "Type", nodeType, "ID", nodeId, "IP", nodeIp)
                         return true
                 }
         }
-        log.Warn("Node ID Not Found in Node Protocol Data", "Validated", "False", "Type", nodeType, "ID Needing Verification", nodeId, "Hash", blockHash, "Saved ID", common.BytesToHash([]byte(data.Id)), "Saved Hash", data.Hash)
+        log.Warn("Node ID Not Found in Node Protocol Data", "Validated", "False", "Type", nodeType, "ID Needing Verification", nodeId, "Hash", blockHash, "IP", nodeIp, "Saved ID", common.BytesToHash([]byte(data.Id)), "Saved Hash", data.Hash, "Saved IP", common.BytesToHash([]byte(data.Ip)))
 
         return false
 }
@@ -163,16 +164,16 @@ func GetHeadNodeProtocolDataEntry(nodeType string) (uint64, common.Hash) {
 }
 
 // GetNodeProtocolData returns the nodeid at specified blockHash of specific node type
-func GetNodeProtocolData(nodeType string, blockHash common.Hash, blockNumber uint64) string {
+func GetNodeProtocolData(nodeType string, blockHash common.Hash, blockNumber uint64) (string, string, error) {
         if len(nodeProtocolData) == 0 {
                 SetupNodeProtocolMapping()
         }
 
         data, err := GetNodeDataState(nodeType, blockNumber)
         if err == nil {
-                return data.Id
+                return data.Id, data.Ip, nil
         }
-        return ""
+        return "", "", errors.New("Node Protocol Data Not Found")
 }
 
 // RollBackNodeProtocolData removes a specific amount of data starting with head
@@ -207,54 +208,56 @@ func RemoveNodeProtocolData(nodeType string, blockHash common.Hash, blockNumber 
 }
 
 // UpdateNodeProtocolData updates protocol mapping data for verified nodes
-func UpdateNodeProtocolData(nodeType string, nodeId string, peerId string, peerCount int, blockHash common.Hash, blockNumber uint64, syncing bool) {
+func UpdateNodeProtocolData(nodeType string, nodeId string, nodeIp string, peerId string, peerCount int, blockHash common.Hash, blockNumber uint64, syncing bool) {
         if !syncing {
                nodeprotocolmessaging.SyncWg.Wait()
         }
         mux.Lock()
         defer mux.Unlock()
-                consensusData := nodeProtocolData[nodeType].nodeConsensusMap
-                if peerMap, ok := consensusData[blockHash][nodeId]; ok  && !syncing {
+        log.Trace("Attempting To Update Node Protocol Data", "Type", nodeType, "ID", nodeId, "IP", nodeIp, "Number", blockNumber, "Hash", blockHash)
+        consensusData := nodeProtocolData[nodeType].nodeConsensusMap
+        if peerMap, ok := consensusData[blockHash][nodeId]; ok  && !syncing {
 
-                        localData, err := GetNodeDataState(nodeType, blockNumber)
-                        if err == nil && localData.Id == "" && nodeId != "" {
-                                consensusData[blockHash] = make(map[string]map[string]string)
-                                consensusAddition := make(map[string]string)
-                                consensusAddition[peerId] = peerId
-                                consensusData[blockHash][nodeId] = consensusAddition
-                                data := protocolData{nodeConsensusMap: consensusData}
-                                nodeProtocolData[nodeType] = data
-                                ReplaceNodeDataState(nodeType, blockHash, nodeId, blockNumber)
-                                return
-                        } else if  _, ok := peerMap[peerId]; ok && err == nil {
-                                return
-                        } else {
-                                peerMap[peerId] = peerId
-                                if len(peerMap) > (peerCount / 2) && localData.Id != nodeId {
-                                        ReplaceNodeDataState(nodeType, blockHash, nodeId, blockNumber)
-                                        log.Trace("Node Protocol Data Updated - Node Consensus Achieved", "Type", nodeType, "ID", nodeId, "Hash", blockHash)
-                                }
-                                consensusData[blockHash][nodeId] = peerMap
-                                data := protocolData{nodeConsensusMap: consensusData}
-                                nodeProtocolData[nodeType] = data
-                                return
-                        }
-                } else {
-
-                        // Initiate consensus mapping
+                localData, err := GetNodeDataState(nodeType, blockNumber)
+                if err == nil && localData.Id == "" && nodeId != "" {
                         consensusData[blockHash] = make(map[string]map[string]string)
                         consensusAddition := make(map[string]string)
-
                         consensusAddition[peerId] = peerId
                         consensusData[blockHash][nodeId] = consensusAddition
-
                         data := protocolData{nodeConsensusMap: consensusData}
                         nodeProtocolData[nodeType] = data
-                        log.Trace("Node Protocol Data Updated - Initial Data Added", "Type", nodeType, "ID", nodeId, "Hash", blockHash)
-
-                        ReplaceNodeDataState(nodeType, blockHash, nodeId, blockNumber)
+                        ReplaceNodeDataState(nodeType, blockHash, nodeId, blockNumber, nodeIp)
+                        return
+                } else if  _, ok := peerMap[peerId]; ok && err == nil {
+                        return
+                } else {
+                        peerMap[peerId] = peerId
+                        if len(peerMap) > (peerCount / 2) && localData.Id != nodeId {
+                                ReplaceNodeDataState(nodeType, blockHash, nodeId, blockNumber, nodeIp)
+                                log.Trace("Node Protocol Data Updated - Node Consensus Achieved", "Type", nodeType, "ID", nodeId, "IP", nodeIp, "Hash", blockHash)
+                        }
+                        consensusData[blockHash][nodeId] = peerMap
+                        data := protocolData{nodeConsensusMap: consensusData}
+                        nodeProtocolData[nodeType] = data
                         return
                 }
+        } else {
+
+                // Initiate consensus mapping
+                consensusData[blockHash] = make(map[string]map[string]string)
+                consensusAddition := make(map[string]string)
+
+                consensusAddition[peerId] = peerId
+                consensusData[blockHash][nodeId] = consensusAddition
+
+                data := protocolData{nodeConsensusMap: consensusData}
+                nodeProtocolData[nodeType] = data
+                log.Trace("Node Protocol Data Updated - Initial Data Added", "Type", nodeType, "ID", nodeId, "IP", nodeIp, "Hash", blockHash)
+
+                // With enough nodes this should go away in order to only add via consensus unless syncing
+                ReplaceNodeDataState(nodeType, blockHash, nodeId, blockNumber, nodeIp)
+                return
+        }
 }
 
 // SyncNodeProtocolDataGroup adds a slice of NodeData to state is consenus is reached
@@ -271,7 +274,7 @@ func SyncNodeProtocolDataGroup(nodeType string, nodeData map[uint64]NodeData, pe
                 } else if blockNumber < smallestBlockNumber {
                         smallestBlockNumber = blockNumber
                 }
-                go UpdateNodeProtocolData(nodeType, data.Id, peerId, peerCount, data.Hash, blockNumber, true)
+                go UpdateNodeProtocolData(nodeType, data.Id, data.Ip, peerId, peerCount, data.Hash, blockNumber, true)
         }
 
         if len(nodeData) > 0 {
@@ -281,19 +284,21 @@ func SyncNodeProtocolDataGroup(nodeType string, nodeData map[uint64]NodeData, pe
 }
 
 //func GetNodeProtocolDataGroup(nodeType string, startBlock uint64, endBlock uint64) (map[uint64]NodeData, error) {
-func GetNodeProtocolDataGroup(nodeType string, startBlock uint64, endBlock uint64) ([]string, []string, []string, error) {
+func GetNodeProtocolDataGroup(nodeType string, startBlock uint64, endBlock uint64) ([]string, []string, []string, []string, error) {
         var hashes []string
         var nodes  []string
+        var ips  []string
         var numbers []string
         for i := startBlock; i <= endBlock; i++ {
                 data, err := GetNodeDataState(nodeType, i)
                 if err == nil {
-                        hashes = append(hashes, data.Hash.String())
-                        nodes = append(nodes, data.Id)
+                        hashes  = append(hashes, data.Hash.String())
+                        nodes   = append(nodes, data.Id)
+                        ips     = append(ips, data.Ip)
                         numbers = append(numbers, strconv.FormatUint(i, 10))
                 }
         }
-        return hashes, nodes, numbers, nil
+        return hashes, nodes, numbers, ips, nil
 }
 
 // GetNodeId return enodeid in string format from *enode.Node

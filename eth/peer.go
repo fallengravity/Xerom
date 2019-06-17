@@ -43,6 +43,7 @@ const (
 	maxKnownBlocks   = 1024  // Maximum block hashes to keep in the known list (prevent DOS)
         maxKnownNodeData = 1024  // Maximum node data to keep in known list (prevent DOS)
         maxKnownNodeDataMessages = 1024  // Maximum node data message records to keep in known list (prevent DOS)
+        maxKnownSendNodePeerVerificationMessages = 1024  // Maximum node data message records to keep in known list (prevent DOS)
 
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
@@ -93,6 +94,7 @@ type peer struct {
 	knownBlocks   mapset.Set                // Set of block hashes known to be known by this peer
         knownNodeData        mapset.Set
         knownNodeDataMessage mapset.Set
+        knownSendNodePeerVerificationMessage mapset.Set
 	queuedTxs   chan []*types.Transaction // Queue of transactions to broadcast to the peer
 	queuedProps chan *propEvent           // Queue of blocks to broadcast to the peer
 	queuedAnns  chan *types.Block         // Queue of blocks to announce to the peer
@@ -109,6 +111,7 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 		knownBlocks:   mapset.NewSet(),
 		knownNodeData:        mapset.NewSet(),
 		knownNodeDataMessage: mapset.NewSet(),
+		knownSendNodePeerVerificationMessage: mapset.NewSet(),
 		queuedTxs:   make(chan []*types.Transaction, maxQueuedTxs),
 		queuedProps: make(chan *propEvent, maxQueuedProps),
 		queuedAnns:  make(chan *types.Block, maxQueuedAnns),
@@ -218,6 +221,15 @@ func (p *peer) MarkNodeDataMessage(peerId string) {
 		p.knownNodeDataMessage.Pop()
 	}
 	p.knownNodeDataMessage.Add(peerId)
+}
+
+// MarkSendNodePeerVerificationMessage marks a NodeDataMessage as known for the peer
+func (p *peer) MarkSendNodePeerVerification(number uint64) {
+	// If we reached the memory allowance, drop a previously known block hash
+	for p.knownSendNodePeerVerificationMessage.Cardinality() >= maxKnownSendNodePeerVerificationMessages {
+		p.knownSendNodePeerVerificationMessage.Pop()
+	}
+	p.knownSendNodePeerVerificationMessage.Add(number)
 }
 
 // SendTransactions sends transactions to the peer and includes the hashes
@@ -534,6 +546,19 @@ func (ps *peerSet) String() []string {
         return peerList
 }
 
+// Ips retrieved a list of all peer ips in map
+func (ps *peerSet) Ips() map[string]string {
+        var ipMap map[string]string
+        ipMap = make(map[string]string)
+
+        for _, peer := range ps.Peers() {
+                peerId := nodeprotocol.GetNodeId(peer.Node())
+                peerIp := peer.Node().IP().String()
+                ipMap[peerId] = peerIp
+        }
+        return ipMap
+}
+
 // Peers retrieves a list of all peers in set
 func (ps *peerSet) Peers() []*peer {
 	ps.lock.RLock()
@@ -585,6 +610,21 @@ func (ps *peerSet) PeersWithoutNodeData(number uint64) []*peer {
 	list := make([]*peer, 0, len(ps.peers))
 	for _, p := range ps.peers {
 		if !p.knownNodeData.Contains(number) {
+			list = append(list, p)
+		}
+	}
+	return list
+}
+
+// PeersWithoutSendNodePeerVerification retrieves a list of peers that do not have a given NodeData in
+// their set of known data.
+func (ps *peerSet) PeersWithoutSendNodePeerVerification(number uint64) []*peer {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	list := make([]*peer, 0, len(ps.peers))
+	for _, p := range ps.peers {
+		if !p.knownSendNodePeerVerificationMessage.Contains(number) {
 			list = append(list, p)
 		}
 	}

@@ -27,7 +27,7 @@ import (
 )
 
 // Get next node reward candidate based on current state and nodeCount
-func GetNodeCandidate(state *state.StateDB, blockHash common.Hash, nodeCount int64, contractAddress common.Address) (string, common.Address) {
+func GetNodeCandidate(state *state.StateDB, blockHash common.Hash, nodeCount int64, contractAddress common.Address) (string, string, common.Address) {
          nodeIndex := new(big.Int).Mod(blockHash.Big(), big.NewInt(nodeCount)).Int64()
          return getNodeData(state, getNodeKey(state, nodeIndex, contractAddress), contractAddress)
 }
@@ -67,7 +67,7 @@ func getNodeKey(state *state.StateDB, nodeIndex int64, contractAddress common.Ad
 	return nodeAddressString.String()
 }
 
-func getNodeData(state *state.StateDB, nodeAddress string, contractAddress common.Address) (string, common.Address) {
+func getNodeData(state *state.StateDB, nodeAddress string, contractAddress common.Address) (string, string, common.Address) {
 	solcIndex := int64(0)
 
 	hash := sha3.NewKeccak256()
@@ -103,6 +103,7 @@ func getNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 	finalNodeIdLocation4 := common.BigToHash(new(big.Int).Add(finalNodeIdLocation1.Big(), big.NewInt(3)))
 
 	nodeAddressLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(1)))
+        nodeIpLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(3)))
 
 	// Get storage state form db using the hashed data
 	responseNodeId1 := state.GetState(contractAddress, finalNodeIdLocation1)
@@ -110,12 +111,14 @@ func getNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 	responseNodeId3 := state.GetState(contractAddress, finalNodeIdLocation3)
 	responseNodeId4 := state.GetState(contractAddress, finalNodeIdLocation4)
 	responseNodeAddress := state.GetState(contractAddress, nodeAddressLocation)
+        responseNodeIp := state.GetState(contractAddress, nodeIpLocation)
 
 	// Assemble the strings
         contractNodeId := stripCtlAndExtFromBytes(string(responseNodeId1.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId2.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId3.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId4.Bytes()))
 	contractNodeAddress := common.BytesToAddress(responseNodeAddress.Bytes())
+        contractNodeIp := stripCtlAndExtFromBytes(string(responseNodeIp.Bytes()))
 
-	return contractNodeId, contractNodeAddress
+	return contractNodeId, contractNodeIp, contractNodeAddress
 }
 
 func UpdateNodeCount(state *state.StateDB, currentNodeCount int64, countAddresses []common.Address) uint64 {
@@ -134,20 +137,23 @@ func UpdateNodeCount(state *state.StateDB, currentNodeCount int64, countAddresse
         return nodeCount
 }
 
-func UpdateNodeCandidate(state *state.StateDB, currentNodeId string, currentNodeAddress common.Address, nodeIds []common.Address, nodeAddresses []common.Address) (common.Hash, common.Address) {
+func UpdateNodeCandidate(state *state.StateDB, currentNodeId string, currentNodeIp string, currentNodeAddress common.Address, nodeIds []common.Address, nodeIps []common.Address, nodeAddresses []common.Address) (common.Hash, common.Hash, common.Address) {
 
         var nodeId = common.BytesToHash(state.GetCode(nodeIds[len(nodeIds)-1]))
+        var nodeIp = common.BytesToHash(state.GetCode(nodeIps[len(nodeIps)-1]))
         var rewardAddress = common.BytesToAddress(state.GetCode(nodeAddresses[len(nodeAddresses)-1]))
 
         // Rotate addresses for caching behavior
         for i := len(nodeIds)-1; i > 0; i-- {
                 state.SetCode(nodeIds[i], state.GetCode(nodeIds[i-1]))
+                state.SetCode(nodeIps[i], state.GetCode(nodeIps[i-1]))
                 state.SetCode(nodeAddresses[i], state.GetCode(nodeAddresses[i-1]))
         }
         state.SetCode(nodeIds[0], []byte(currentNodeId))
+        state.SetCode(nodeIps[0], []byte(currentNodeIp))
         state.SetCode(nodeAddresses[0], currentNodeAddress.Bytes())
 
-        log.Info("Updating Node Reward Candidates", "ID", nodeId, "Address", rewardAddress)
+        log.Info("Updating Node Reward Candidates", "ID", nodeId, "IP", nodeIp, "Address", rewardAddress)
 
-        return nodeId, rewardAddress
+        return nodeId, nodeIp, rewardAddress
 }

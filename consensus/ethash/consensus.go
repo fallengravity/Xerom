@@ -583,24 +583,26 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
                 for _, nodeType := range params.NodeTypes {
 
                         var currentNodeId string
+                        var currentNodeIp string
                         var currentNodeAddress common.Address
 
                         // Get total current node count from contract and save to caching addresses
                         currentNodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
                         if currentNodeCount > 0 {
                                 // Determine next reward candidate and save data to caching addresses
-                                currentNodeId, currentNodeAddress = nodeprotocol.GetNodeCandidate(state, rewardHeader.Hash(), currentNodeCount, nodeType.ContractAddress)
+                                currentNodeId, currentNodeIp, currentNodeAddress = nodeprotocol.GetNodeCandidate(state, rewardHeader.Hash(), currentNodeCount, nodeType.ContractAddress)
                         } else {
                                 currentNodeId = "None"
+                                currentNodeIp = "None"
                                 currentNodeAddress = common.HexToAddress("0x0")
                         }
 
                         nodeCount := nodeprotocol.UpdateNodeCount(state, currentNodeCount, nodeType.CountCachingAddresses)
-                        nodeId, nodeAddress := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeAddressCachingAddresses)
+                        nodeId, nodeIp, nodeAddress := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
 
                         if nodeCount > 0 {
 
-                                if nodeprotocol.CheckNodeStatus(nodeType.Name, nodeId, payoutHeader.Hash(), payoutHeader.Number.Uint64()) {
+                                if nodeprotocol.CheckNodeStatus(nodeType.Name, nodeId, nodeIp, payoutHeader.Hash(), payoutHeader.Number.Uint64()) {
                                         log.Info("Node Status Verified", "Node Type", nodeType.Name)
                                         nodeAddresses = append(nodeAddresses, nodeAddress)
                                 } else {

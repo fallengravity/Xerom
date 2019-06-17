@@ -482,7 +482,7 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
                                         log.Info("Node Protocol Data Synchronisation In Progress", "Start Block", syncStartBlock, "End Block", peerHead.Number.Uint64())
                                         if syncBlockCount > maxNodeProtocolData {
                                                 blockCount := uint64(0)
-                                                for i := (peerHead.Number.Int64() - int64(maxNodeProtocolData)); i > (int64(syncStartBlock) - int64(maxNodeProtocolData)); i = i - int64(maxNodeProtocolData) {
+                                                for i := (peerHead.Number.Int64() + int64(maxNodeProtocolData)); i > (int64(syncStartBlock) - int64(maxNodeProtocolData)); i = i - int64(maxNodeProtocolData) {
                                                         blockCount = maxNodeProtocolData
                                                         blockStart := uint64(0)
                                                         if i <= int64(syncStartBlock) {
@@ -507,10 +507,40 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
                                                 }
                                         }
                                 }
+                        } else {
+                                peerHead, err := d.fetchHeight(p)
+                                if err == nil {
+                                        syncStartBlock := origin
+                                        syncBlockCount := peerHead.Number.Uint64() - syncStartBlock
+
+                                        nodeprotocol.SetTargetSyncNumber(peerHead.Number.Uint64())
+
+                                        log.Info("Node Protocol Data Synchronisation In Progress", "Start Block", syncStartBlock, "End Block", peerHead.Number.Uint64())
+                                        if syncBlockCount > maxNodeProtocolData {
+                                                blockCount := uint64(0)
+                                                for i := int64(syncStartBlock); i < (peerHead.Number.Int64() + int64(maxNodeProtocolData)); i = i + int64(maxNodeProtocolData) {
+                                                        blockCount = maxNodeProtocolData
+                                                        blockStart := uint64(i)
+                                                        log.Trace("Node Protocol Data Synchronisation In Progress", "Start Block", blockStart, "End Block", blockStart + blockCount)
+
+                                                        for _, nodeType := range params.NodeTypes {
+                                                                data := []string{nodeType.Name, strconv.FormatUint(blockStart, 10), strconv.FormatUint(blockCount, 10)}
+                                                                go nodeprotocolmessaging.RequestNodeProtocolSyncData(data)
+                                                        }
+                                                        time.Sleep(1 * time.Second)
+                                                }
+                                        } else {
+                                                log.Trace("Node Protocol Data Synchronisation In Progess", "Start Block", syncStartBlock, "End Block", syncStartBlock + syncBlockCount)
+                                                for _, nodeType := range params.NodeTypes {
+                                                        data := []string{nodeType.Name, strconv.FormatUint(syncStartBlock, 10), strconv.FormatUint(uint64(syncBlockCount), 10)}
+                                                        go nodeprotocolmessaging.RequestNodeProtocolSyncData(data)
+                                                }
+                                        }
+                                }
                         }
                 }()
 
-                //isNodeProtocolSynced = true // to skip sync during testing
+                //var isTesting := true // to skip sync during testing
 
                 if !isNodeProtocolSynced  && peerHead.Number.Int64() >= params.NodeProtocolBlock {
                         isNodeProtocolSynced = true

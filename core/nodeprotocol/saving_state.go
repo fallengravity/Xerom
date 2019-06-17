@@ -34,6 +34,7 @@ type NodeData struct {
         Hash   common.Hash  `json:"hash"`
         Id     string       `json:"id"`
         Number uint64       `json:"number"`
+        Ip     string       `json:"ip"`
 }
 
 type NodeDatabaseHandlers struct {
@@ -95,9 +96,9 @@ func InitiateNodeProtocolStateAccess(nodeType string) {
 
 }
 
-func SaveNodeDataState(nodeType string, hash common.Hash, id string, blockNumber uint64) {
+func SaveNodeDataState(nodeType string, hash common.Hash, id string, blockNumber uint64, ip string) {
         if client, ok := StateAccessClient[nodeType]; ok {
-                client.SaveNodeData(NodeData{Id: id, Hash: hash, Number: blockNumber}, blockNumber)
+                client.SaveNodeData(NodeData{Id: id, Hash: hash, Number: blockNumber, Ip: ip}, blockNumber)
         }
 }
 func DeleteNodeDataState(nodeType string, hash common.Hash, blockNumber uint64) {
@@ -120,17 +121,17 @@ func GetFullNodeDataState(nodeType string) (map[uint64]NodeData, error) {
 func GetNodeDataStateLatest(nodeType string) (uint64, NodeData, error) {
         if client, ok := StateAccessClient[nodeType]; ok {
                 number, data, err := client.GetLatestNodeData()
-                log.Info("Protocol Head Data State", "Type", nodeType, "Number", number, "Hash", data.Hash, "ID", data.Id)
+                log.Info("Protocol Head Data State", "Type", nodeType, "Number", number, "Hash", data.Hash, "ID", data.Id, "IP", data.Ip)
                 return number, data, err
          }
          return 0, NodeData{}, errors.New("Node Protocol Client Not Ready")
 }
-func ReplaceNodeDataState(nodeType string, hash common.Hash, id string, blockNumber uint64) {
+func ReplaceNodeDataState(nodeType string, hash common.Hash, id string, blockNumber uint64, ip string) {
         _, err := GetNodeDataState(nodeType, blockNumber)
         if err == nil {
                 DeleteNodeDataState(nodeType, hash, blockNumber)
         }
-        SaveNodeDataState(nodeType, hash, id, blockNumber)
+        SaveNodeDataState(nodeType, hash, id, blockNumber, ip)
 }
 
 // GetNodeData returns specific id based on hash
