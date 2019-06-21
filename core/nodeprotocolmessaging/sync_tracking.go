@@ -18,9 +18,9 @@ package nodeprotocolmessaging
 
 import (
 
-        "github.com/ethereum/go-ethereum/log"
+//        "github.com/ethereum/go-ethereum/log"
 )
-
+/*
 var nodeProtocolHead uint64
 
 var nodeProtocolHeadChannel chan uint64
@@ -52,3 +52,4 @@ func Background(ch chan uint64, done chan uint64) {
 	done <- 0
 }
 
+*/

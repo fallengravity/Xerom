@@ -21,6 +21,7 @@ import (
 
         "github.com/ethereum/go-ethereum/common"
         "github.com/ethereum/go-ethereum/core/state"
+        "github.com/ethereum/go-ethereum/core/types"
 )
 
 var pm Manager
@@ -43,6 +44,10 @@ type PeerSet interface {
 
 type Blockchain interface {
         StateAt(hash common.Hash) (*state.StateDB, error)
+        Rollback(chain []common.Hash) 
+        GetBlockByNumber(number uint64) *types.Block
+        CurrentBlock() *types.Block
+        GetBlockByHash(hash common.Hash) *types.Block
 }
 
 func SetBlockchain(blockchain Blockchain) {
@@ -53,12 +58,26 @@ func GetStateAt(hash common.Hash) (*state.StateDB, error) {
         return bc.StateAt(hash)
 }
 
+func GetBlockByHash(hash common.Hash) *types.Block {
+        return bc.GetBlockByHash(hash)
+}
+
 func SetProtocolManager(manager Manager) {
         pm = manager
 }
 
 func SetPeerSet(ps PeerSet) {
        peerSet = ps
+}
+
+func RollBackChain(count uint64) {
+        var chain []common.Hash
+        currentBlockNumber := bc.CurrentBlock().Header().Number.Uint64()
+        for i := uint64(0); i < count; i++ {
+                hash := bc.GetBlockByNumber(currentBlockNumber - i).Hash()
+                chain = append(chain, hash)
+        }
+        bc.Rollback(chain)
 }
 
 func CheckPeerSet(id string, ip string) bool {

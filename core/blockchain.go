@@ -47,7 +47,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/hashicorp/golang-lru"
-
 )
 
 var (
@@ -511,10 +510,9 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 //
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) insert(block *types.Block) {
-
         rewardBlock := bc.GetBlockByNumber(block.NumberU64() - 100)
         // Check for next node up for reward
-        if nodeprotocol.NodeFlag && rewardBlock != nil  && block.Header().Number.Int64() > params.NodeProtocolBlock {
+        if rewardBlock != nil  && block.Header().Number.Int64() > params.NodeProtocolBlock {
                 for _, nodeType := range params.NodeTypes {
                         // Get current state snapshot
                         state, err := bc.State()
@@ -525,23 +523,21 @@ func (bc *BlockChain) insert(block *types.Block) {
                                         nodeId, nodeIp, _ := nodeprotocol.GetNodeCandidate(state, rewardBlock.Hash(), nodeCount, nodeType.ContractAddress)
                                         rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
 
+                                        selfId := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode().Server().Self())
+
                                         if nodeprotocolmessaging.CheckPeerSet(nodeId, nodeIp) {
-                                                log.Info("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name, "ID", nodeId, "IP", nodeIp)
+                                                log.Info("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name, "ID", nodeId)
                                                 var data = []string{nodeType.Name, nodeId, nodeIp, rewardBlock.Hash().String(), rewardBlockNumber}
-                                                peerId := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode().Server().Self())
-                                                go nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, nodeIp, peerId, nodeprotocolmessaging.GetPeerCount(), rewardBlock.Hash(), rewardBlock.NumberU64(), false)
-                                                go nodeprotocolmessaging.SendNodeProtocolData(data)
-                                        } else {
-                                                log.Info("Reward Candidate Not Found in Peerset - Requesting Node Activity Data", "Type", nodeType.Name)
-                                                var data = []string{nodeType.Name, rewardBlock.Hash().String(), rewardBlockNumber}
-                                                go nodeprotocolmessaging.RequestNodeProtocolData(data)
-                                                peerData := []string{nodeType.Name, rewardBlock.Hash().String(), rewardBlockNumber, nodeId}
-                                                go nodeprotocolmessaging.RequestNodeProtocolPeerVerification(peerData)
+                                                nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, nodeIp, selfId, nodeprotocolmessaging.GetPeerCount(), rewardBlock.Hash(), rewardBlock.NumberU64(), false)
+                                                nodeprotocolmessaging.SendNodeProtocolData(data)
                                         }
-                                        // Request previous data as redundancy
-                                        //rewardParentBlockNumber := strconv.FormatUint(rewardBlock.NumberU64()-1, 10)
-                                        //var data = []string{nodeType.Name, rewardBlock.ParentHash().String(), rewardParentBlockNumber}
-                                        //go nodeprotocolmessaging.RequestNodeProtocolData(data)
+                                        previousRewardBlock := bc.GetBlockByHash(rewardBlock.ParentHash())
+                                        if previousRewardBlock != nil && !nodeprotocol.CheckUpToDate(nodeType.Name, previousRewardBlock.Hash(), previousRewardBlock.NumberU64()) {
+                                                log.Info("Requesting Previous Reward Block Candidate Data", "Type", nodeType.Name)
+                                                previousRewardBlockNumber := strconv.FormatUint(previousRewardBlock.NumberU64(), 10)
+                                                var data = []string{nodeType.Name, previousRewardBlock.Hash().String(), previousRewardBlockNumber}
+                                                nodeprotocolmessaging.RequestNodeProtocolData(data)
+                                        }
                                 }
                         }
                 }
@@ -809,7 +805,6 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 		hash := chain[i]
 
 		currentHeader := bc.hc.CurrentHeader()
-
 		if currentHeader.Hash() == hash {
 			bc.hc.SetCurrentHeader(bc.GetHeader(currentHeader.ParentHash, currentHeader.Number.Uint64()-1))
 		}

@@ -96,6 +96,11 @@ func InitiateNodeProtocolStateAccess(nodeType string) {
 
 }
 
+func SaveNodeDataStateGroup(nodeType string, data map[uint64]NodeData) {
+        if client, ok := StateAccessClient[nodeType]; ok {
+                client.SaveNodeDataGroup(data)
+        }
+}
 func SaveNodeDataState(nodeType string, hash common.Hash, id string, blockNumber uint64, ip string) {
         if client, ok := StateAccessClient[nodeType]; ok {
                 client.SaveNodeData(NodeData{Id: id, Hash: hash, Number: blockNumber, Ip: ip}, blockNumber)
@@ -188,6 +193,18 @@ func (c *NodeDataClient) GetLatestNodeData() (uint64, NodeData, error) {
 	return maxKey, maxData, nil
 }
 
+// SaveNodeDataGroup saves a group of NodeData
+func (c *NodeDataClient) SaveNodeDataGroup(data map[uint64]NodeData) (map[uint64]NodeData, error) {
+	update := NewSaveNodeDataGroupUpdate(data)
+
+	c.Updates <- update
+
+	if err := <-update.ExitChan(); err != nil {
+		return data, err
+	}
+	return <-update.saved, nil
+}
+
 // SaveNodeData saves a new NodeData entry
 func (c *NodeDataClient) SaveNodeData(data NodeData, blockNumber uint64) (NodeData, error) {
 	update := NewSaveNodeDataUpdate(data, blockNumber)
@@ -264,6 +281,31 @@ func (c *NodeDataClient) getNodeDataHash() (map[uint64]NodeData, error) {
 	return <-update.nodeDatabase, nil
 }
 
+// Save NodeData Group to state
+type SaveNodeDataGroupUpdate struct {
+	toSave   map[uint64]NodeData
+	saved    chan map[uint64]NodeData
+	exitChan chan error
+}
+func NewSaveNodeDataGroupUpdate(data map[uint64]NodeData) *SaveNodeDataGroupUpdate {
+	return &SaveNodeDataGroupUpdate{
+		toSave:      data,
+		saved:    make(chan map[uint64]NodeData, 1),
+		exitChan: make(chan error, 1),
+	}
+}
+func (j SaveNodeDataGroupUpdate) ExitChan() chan error {
+	return j.exitChan
+}
+func (j SaveNodeDataGroupUpdate) Run(nodeDatabase map[uint64]NodeData) (map[uint64]NodeData, error) {
+	var data map[uint64]NodeData
+        data = j.toSave
+        for key, val := range data {
+	        nodeDatabase[key] = val
+        }
+	j.saved <- data
+	return nodeDatabase, nil
+}
 
 // Save NodeData to state
 type SaveNodeDataUpdate struct {

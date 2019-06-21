@@ -28,10 +28,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+        "strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 const (
@@ -88,6 +90,7 @@ type Peer interface {
 	RequestBodies([]common.Hash) error
 	RequestReceipts([]common.Hash) error
 	RequestNodeData([]common.Hash) error
+	RequestNodeProtocolSyncData([]string) error
 }
 
 // lightPeerWrapper wraps a LightPeer struct, stubbing out the Peer-only methods.
@@ -110,6 +113,9 @@ func (w *lightPeerWrapper) RequestReceipts([]common.Hash) error {
 }
 func (w *lightPeerWrapper) RequestNodeData([]common.Hash) error {
 	panic("RequestNodeData not supported in light client mode sync")
+}
+func (w *lightPeerWrapper) RequestNodeProtocolSyncData([]string) error {
+	panic("RequestNodeProtocolSyncData not supported in light client mode sync")
 }
 
 // newPeerConnection creates a new downloader peer.
@@ -155,6 +161,14 @@ func (p *peerConnection) FetchHeaders(from uint64, count int) error {
 	}
 	p.headerStarted = time.Now()
 
+        //startBlock := nodeprotocolmessaging.GetBlockByHash(hashes[0])
+        //startBlockNumber := request.Headers[0].Number.Uint64()
+        for _, nodeType := range params.NodeTypes {
+               //data := []string{nodeType.Name, strconv.FormatUint((startBlockNumber), 10), strconv.FormatUint(uint64(len(hashes)), 10)}
+               data := []string{nodeType.Name, strconv.FormatUint((from), 10), strconv.FormatUint(uint64(count + 105), 10)}
+               go p.peer.RequestNodeProtocolSyncData(data)
+        }
+
 	// Issue the header retrieval request (absolut upwards without gaps)
 	go p.peer.RequestHeadersByNumber(from, count, 0, false)
 
@@ -178,6 +192,16 @@ func (p *peerConnection) FetchBodies(request *fetchRequest) error {
 	for _, header := range request.Headers {
 		hashes = append(hashes, header.Hash())
 	}
+
+        //startBlock := nodeprotocolmessaging.GetBlockByHash(hashes[0])
+       /* startBlockNumber := request.Headers[0].Number.Uint64()
+        for _, nodeType := range params.NodeTypes {
+               data := []string{nodeType.Name, strconv.FormatUint((startBlockNumber), 10), strconv.FormatUint(uint64(len(hashes) + 105), 10)}
+               //data := []string{nodeType.Name, strconv.FormatUint((from), 10), strconv.FormatUint(uint64(count), 10)}
+               go p.peer.RequestNodeProtocolSyncData(data)
+        }
+*/
+
 	go p.peer.RequestBodies(hashes)
 
 	return nil
@@ -200,6 +224,16 @@ func (p *peerConnection) FetchReceipts(request *fetchRequest) error {
 	for _, header := range request.Headers {
 		hashes = append(hashes, header.Hash())
 	}
+
+        //startBlock := nodeprotocolmessaging.GetBlockByHash(hashes[0])
+  /*      startBlockNumber := request.Headers[0].Number.Uint64()
+        for _, nodeType := range params.NodeTypes {
+               data := []string{nodeType.Name, strconv.FormatUint((startBlockNumber), 10), strconv.FormatUint(uint64(len(hashes) + 105), 10)}
+               //data := []string{nodeType.Name, strconv.FormatUint((from), 10), strconv.FormatUint(uint64(count), 10)}
+               go p.peer.RequestNodeProtocolSyncData(data)
+        }
+
+*/
 	go p.peer.RequestReceipts(hashes)
 
 	return nil

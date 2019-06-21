@@ -30,7 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/nodeprotocol"
-//	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -626,15 +625,6 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 
 	// Header seems complete, assemble into a block and return
 	return types.NewBlock(header, txs, uncles, receipts), nil
-}
-
-func checkDisqualifiedNodes(arr []common.Address, compare common.Address) bool {
-        for _, a := range arr {
-                if a == compare {
-                        return true
-                }
-        }
-        return false
 }
 
 // SealHash returns the hash of a block prior to it being sealed.

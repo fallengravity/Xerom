@@ -206,7 +206,7 @@ func (p *peer) MarkTransaction(hash common.Hash) {
 
 // MarkNodeData marks a NodeData as known for the peer, ensuring that the data will
 // never be propagated to this particular peer.
-func (p *peer) MarkNodeData(number uint64) {
+func (p *peer) MarkNodeData(number string) {
 	// If we reached the memory allowance, drop a previously known block hash
 	for p.knownNodeData.Cardinality() >= maxKnownNodeData {
 		p.knownNodeData.Pop()
@@ -220,11 +220,12 @@ func (p *peer) MarkNodeDataMessage(peerId string) {
 	for p.knownNodeDataMessage.Cardinality() >= maxKnownNodeDataMessages {
 		p.knownNodeDataMessage.Pop()
 	}
-	p.knownNodeDataMessage.Add(peerId)
+        hash, _ := p.Head()
+	p.knownNodeDataMessage.Add(peerId + hash.String())
 }
 
 // MarkSendNodePeerVerificationMessage marks a NodeDataMessage as known for the peer
-func (p *peer) MarkSendNodePeerVerification(number uint64) {
+func (p *peer) MarkSendNodePeerVerification(number string) {
 	// If we reached the memory allowance, drop a previously known block hash
 	for p.knownSendNodePeerVerificationMessage.Cardinality() >= maxKnownSendNodePeerVerificationMessages {
 		p.knownSendNodePeerVerificationMessage.Pop()
@@ -371,19 +372,19 @@ func (p *peer) RequestBodies(hashes []common.Hash) error {
 // RequestNodeProtocolData fetches a specific hash/state of node data of a specific
 // node type
 func (p *peer) RequestNodeProtocolData(data []string) error {
-	p.Log().Debug("Requesting Node Protocol Data", "Type", data[0], "Hash", data[1], "Number", data[2])
+	//p.Log().Debug("Requesting Node Protocol Data", "Type", data[0], "Hash", data[1], "Number", data[2])
 	return p2p.Send(p.rw, GetNodeProtocolDataMsg, data)
 }
 
 // RequestNodeProtocolSyncData requests initial node validation data on sync
 func (p *peer) RequestNodeProtocolSyncData(data []string) error {
-	p.Log().Debug("Requesting Node Protocol Data Sync", "Type", data[0], "Number", data[1], "Count", data[2])
+	//p.Log().Debug("Requesting Node Protocol Data Sync", "Type", data[0], "Number", data[1], "Count", data[2])
 	return p2p.Send(p.rw, GetNodeProtocolSyncDataMsg, data)
 }
 
 // RequestNodeProtocolPeerVerification requests verification of specific peer
 func (p *peer) RequestNodeProtocolPeerVerification(data []string) error {
-	p.Log().Debug("Requesting Node Protocol Peer Verification", "Type", data[0], "Hash", data[1], "Number", data[2], "Peer", data[3])
+	//p.Log().Debug("Requesting Node Protocol Peer Verification", "Type", data[0], "Hash", data[1], "Number", data[2], "Peer", data[3])
 	return p2p.Send(p.rw, GetNodeProtocolPeerVerificationMsg, data)
 }
 
@@ -603,7 +604,7 @@ func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*peer {
 
 // PeersWithoutNodeData retrieves a list of peers that do not have a given NodeData in
 // their set of known data.
-func (ps *peerSet) PeersWithoutNodeData(number uint64) []*peer {
+func (ps *peerSet) PeersWithoutNodeData(number string) []*peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
@@ -618,7 +619,7 @@ func (ps *peerSet) PeersWithoutNodeData(number uint64) []*peer {
 
 // PeersWithoutSendNodePeerVerification retrieves a list of peers that do not have a given NodeData in
 // their set of known data.
-func (ps *peerSet) PeersWithoutSendNodePeerVerification(number uint64) []*peer {
+func (ps *peerSet) PeersWithoutSendNodePeerVerification(number string) []*peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
@@ -637,7 +638,8 @@ func (ps *peerSet) CheckPeerWithoutNodeDataMessage(peerId string, p *peer) bool 
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
-        if !p.knownNodeDataMessage.Contains(peerId) {
+        hash, _ := p.Head()
+        if !p.knownNodeDataMessage.Contains(peerId + hash.String()) {
 			return true
 	}
 	return false
