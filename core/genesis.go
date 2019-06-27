@@ -310,8 +310,8 @@ func DefaultGenesisBlock() *Genesis {
 		Nonce:      0x0000000000000042,
 		ExtraData:  hexutil.MustDecode("0x646563656e7472616c697a6564206279206e6174757265"),
 		GasLimit:   3141592,
-		Difficulty: big.NewInt(5000),
-                Alloc: decodePrealloc(mainnetAllocData),
+		Difficulty: big.NewInt(200000000000),
+		Alloc:      decodePrealloc(mainnetAllocData),
 	}
 }
 
@@ -373,7 +373,7 @@ func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
 			common.BytesToAddress([]byte{6}): {Balance: big.NewInt(1)}, // ECAdd
 			common.BytesToAddress([]byte{7}): {Balance: big.NewInt(1)}, // ECScalarMul
 			common.BytesToAddress([]byte{8}): {Balance: big.NewInt(1)}, // ECPairing
-			faucet:                           {Balance: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(9))},
+			faucet: {Balance: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(9))},
 		},
 	}
 }
