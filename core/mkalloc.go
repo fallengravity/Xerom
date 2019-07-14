@@ -52,7 +52,7 @@ func makelist(g *core.Genesis) allocList {
 		if len(account.Storage) > 0 || len(account.Code) > 0 || account.Nonce != 0 {
 			panic(fmt.Sprintf("can't encode account %x", addr))
 		}
-                bigAddr := new(big.Int).SetBytes(addr.Bytes())
+		bigAddr := new(big.Int).SetBytes(addr.Bytes())
 		a = append(a, allocItem{bigAddr, account.Balance})
 	}
 	sort.Sort(a)

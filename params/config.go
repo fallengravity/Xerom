@@ -17,10 +17,12 @@
 package params
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // Main node type configuration for node-protocol
@@ -236,11 +238,41 @@ type NodeType struct {
 // used to start light syncing from this checkpoint and avoid downloading the
 // entire header chain while still being able to securely access old headers/logs.
 type TrustedCheckpoint struct {
-	Name         string      `json:"-"`
 	SectionIndex uint64      `json:"sectionIndex"`
 	SectionHead  common.Hash `json:"sectionHead"`
 	CHTRoot      common.Hash `json:"chtRoot"`
 	BloomRoot    common.Hash `json:"bloomRoot"`
+}
+
+// HashEqual returns an indicator comparing the itself hash with given one.
+func (c *TrustedCheckpoint) HashEqual(hash common.Hash) bool {
+	if c.Empty() {
+		return hash == common.Hash{}
+	}
+	return c.Hash() == hash
+}
+
+// Hash returns the hash of checkpoint's four key fields(index, sectionHead, chtRoot and bloomTrieRoot).
+func (c *TrustedCheckpoint) Hash() common.Hash {
+	buf := make([]byte, 8+3*common.HashLength)
+	binary.BigEndian.PutUint64(buf, c.SectionIndex)
+	copy(buf[8:], c.SectionHead.Bytes())
+	copy(buf[8+common.HashLength:], c.CHTRoot.Bytes())
+	copy(buf[8+2*common.HashLength:], c.BloomRoot.Bytes())
+	return crypto.Keccak256Hash(buf)
+}
+
+// Empty returns an indicator whether the checkpoint is regarded as empty.
+func (c *TrustedCheckpoint) Empty() bool {
+	return c.SectionHead == (common.Hash{}) || c.CHTRoot == (common.Hash{}) || c.BloomRoot == (common.Hash{})
+}
+
+// CheckpointOracleConfig represents a set of checkpoint contract(which acts as an oracle)
+// config which used for light client checkpoint syncing.
+type CheckpointOracleConfig struct {
+	Address   common.Address   `json:"address"`
+	Signers   []common.Address `json:"signers"`
+	Threshold uint64           `json:"threshold"`
 }
 
 // ChainConfig is the core config which determines the blockchain settings.
@@ -303,7 +335,7 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v  ConstantinopleFix: %v Engine: %v}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v  Petersburg: %v Engine: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -431,7 +463,7 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 		return newCompatError("Constantinople fork block", c.ConstantinopleBlock, newcfg.ConstantinopleBlock)
 	}
 	if isForkIncompatible(c.PetersburgBlock, newcfg.PetersburgBlock, head) {
-		return newCompatError("ConstantinopleFix fork block", c.PetersburgBlock, newcfg.PetersburgBlock)
+		return newCompatError("Petersburg fork block", c.PetersburgBlock, newcfg.PetersburgBlock)
 	}
 	if isForkIncompatible(c.EWASMBlock, newcfg.EWASMBlock, head) {
 		return newCompatError("ewasm fork block", c.EWASMBlock, newcfg.EWASMBlock)
