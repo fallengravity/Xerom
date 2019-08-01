@@ -30,9 +30,10 @@ func SetProtocolFlag(active bool) {
         NodeFlag = active
 }
 
-func CheckActiveNode() {
+func CheckActiveNode(totalNodeCount uint64, hash common.Hash, blockNumber int64) {
         if NodeFlag {
-                log.Info("Node Protocol is Active", "Active", "True")
+                log.Info("Node Protocol is Active", "active", "true")
+                log.Info("Validating Node-Protocol Reward Candidates", "number", blockNumber, "hash", hash, "regisered nodes", totalNodeCount)
         }
 }
 // Clean up data

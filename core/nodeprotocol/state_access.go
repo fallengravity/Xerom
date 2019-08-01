@@ -132,7 +132,7 @@ func UpdateNodeCount(state *state.StateDB, currentNodeCount int64, countAddresse
         currentNodeCountBytes := big.NewInt(currentNodeCount).Bytes()
         state.SetCode(countAddresses[0], currentNodeCountBytes)
 
-        log.Trace("Updating Node Counts", "Count", nodeCount)
+        log.Debug("Updating Node Counts", "Count", nodeCount)
 
         return nodeCount
 }
@@ -153,7 +153,7 @@ func UpdateNodeCandidate(state *state.StateDB, currentNodeId string, currentNode
         state.SetCode(nodeIps[0], []byte(currentNodeIp))
         state.SetCode(nodeAddresses[0], currentNodeAddress.Bytes())
 
-        log.Trace("Updating Node Reward Candidates", "ID", nodeId, "IP", nodeIp, "Address", rewardAddress)
+        log.Debug("Updating Node Reward Candidates", "ID", nodeId, "IP", nodeIp, "Address", rewardAddress)
 
         return nodeId, nodeIp, rewardAddress
 }

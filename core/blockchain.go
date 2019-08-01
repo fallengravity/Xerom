@@ -527,14 +527,14 @@ func (bc *BlockChain) insert(block *types.Block) {
                                                 selfId := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode().Server().Self())
 
                                                 if nodeprotocolmessaging.CheckPeerSet(nodeId, nodeIp) {
-                                                        log.Info("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name, "ID", nodeId)
+                                                        log.Debug("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name, "ID", nodeId)
                                                         var data = []string{nodeType.Name, nodeId, nodeIp, rewardBlock.Hash().String(), rewardBlockNumber}
                                                         nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, nodeIp, selfId, nodeprotocolmessaging.GetPeerCount(), rewardBlock.Hash(), rewardBlock.NumberU64(), false)
                                                         nodeprotocolmessaging.SendNodeProtocolData(data)
                                                 }
                                                 previousRewardBlock := bc.GetBlockByHash(rewardBlock.ParentHash())
                                                 if previousRewardBlock != nil && !nodeprotocol.CheckUpToDate(nodeType.Name, previousRewardBlock.Hash(), previousRewardBlock.NumberU64()) {
-                                                        log.Info("Requesting Previous Reward Block Candidate Data", "Type", nodeType.Name)
+                                                        log.Debug("Requesting Previous Reward Block Candidate Data", "Type", nodeType.Name)
                                                         previousRewardBlockNumber := strconv.FormatUint(previousRewardBlock.NumberU64(), 10)
                                                         var data = []string{nodeType.Name, previousRewardBlock.Hash().String(), previousRewardBlockNumber}
                                                         nodeprotocolmessaging.RequestNodeProtocolData(data)

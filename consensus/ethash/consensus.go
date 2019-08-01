@@ -571,9 +571,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 
 	// If node-protocol is active, validate node payment address
 	if header.Number.Int64() > params.NodeProtocolBlock && header.Number.Int64() > 105 {
-
-		//Checking for active node
-		nodeprotocol.CheckActiveNode()
+                var totalNodeCount uint64
 
 		rewardHeader := chain.GetHeaderByNumber(header.Number.Uint64() - 100)
 		payoutHeader := chain.GetHeaderByNumber(header.Number.Uint64() - 105)
@@ -599,17 +597,17 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			nodeId, nodeIp, nodeAddress := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
 
 			if nodeCount > 0 {
-
+                                totalNodeCount += nodeCount
 				if nodeprotocol.CheckNodeStatus(nodeType.Name, nodeId, nodeIp, payoutHeader.Hash(), payoutHeader.Number.Uint64()) {
-					log.Info("Node Status Verified", "Node Type", nodeType.Name)
+					log.Debug("Node Status Verified", "Node Type", nodeType.Name)
 					nodeAddresses = append(nodeAddresses, nodeAddress)
 				} else {
-					log.Warn("Node Status Not Verified - Deferring To Remainder Address", "Node Type", nodeType.Name)
+					log.Debug("Node Status Not Verified - Deferring To Remainder Address", "Node Type", nodeType.Name)
 					nodeAddresses = append(nodeAddresses, nodeType.RemainderAddress)
 				}
 			} else {
 				// Send reward to remainder address if zero nodes exist
-				log.Warn("No Active Nodes Found - Deferring to Remainder Address", "Node Type", nodeType.Name)
+				log.Debug("No Active Nodes Found - Deferring to Remainder Address", "Node Type", nodeType.Name)
 				nodeAddresses = append(nodeAddresses, nodeType.RemainderAddress)
 			}
 
@@ -617,6 +615,10 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			nodeRemainder := nodeprotocol.GetNodeRemainder(state, uint64(nodeCount), nodeType.RemainderAddress)
 			nodeRemainders = append(nodeRemainders, nodeRemainder)
 		}
+
+		//Checking for active node
+		nodeprotocol.CheckActiveNode(totalNodeCount, header.Hash(), header.Number.Int64())
+
 	}
 	// Accumulate any block and uncle rewards and commit the final state root
 	accumulateRewards(chain.Config(), state, header, uncles, nodeAddresses, nodeRemainders)
