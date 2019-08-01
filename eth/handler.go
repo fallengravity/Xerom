@@ -235,6 +235,23 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	go pm.txsyncLoop()
 }
 
+func (pm *ProtocolManager) NodeProtocolSync() {
+        var from uint64
+        currentBlock := pm.blockchain.CurrentBlock().NumberU64()
+        if currentBlock > uint64(205) {
+                from = currentBlock - uint64(205)
+        } else {
+                from = uint64(0)
+        }
+        if (int64(from) + int64(405)) > params.NodeProtocolBlock {
+                for _, nodeType := range params.NodeTypes {
+                        data := []string{nodeType.Name, strconv.FormatUint((from), 10), strconv.FormatUint(uint64(405), 10)}
+                        peer := pm.peers.BestPeer()
+                        go peer.RequestNodeProtocolSyncData(data)
+                }
+        }
+}
+
 func (pm *ProtocolManager) Stop() {
 	log.Info("Stopping Ethereum protocol")
 
@@ -258,6 +275,10 @@ func (pm *ProtocolManager) Stop() {
 	pm.wg.Wait()
 
 	log.Info("Ethereum protocol stopped")
+}
+
+func (pm *ProtocolManager) SyncStatus() bool {
+        return pm.downloader.Synchronising()
 }
 
 func (pm *ProtocolManager) newPeer(pv int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {

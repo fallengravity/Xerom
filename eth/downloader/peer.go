@@ -161,9 +161,16 @@ func (p *peerConnection) FetchHeaders(from uint64, count int) error {
 	}
 	p.headerStarted = time.Now()
 
-        if (int64(from) + int64(count)) > params.NodeProtocolBlock {
+        nodeProtocolFrom := from
+        if nodeProtocolFrom >= uint64(105) {
+                nodeProtocolFrom = nodeProtocolFrom - uint64(105)
+        } else {
+                nodeProtocolFrom = uint64(0)
+        }
+
+        if (int64(nodeProtocolFrom) + int64(count)) > params.NodeProtocolBlock {
                 for _, nodeType := range params.NodeTypes {
-                        data := []string{nodeType.Name, strconv.FormatUint((from), 10), strconv.FormatUint(uint64(count + 105), 10)}
+                        data := []string{nodeType.Name, strconv.FormatUint((nodeProtocolFrom), 10), strconv.FormatUint(uint64(count + 105), 10)}
                         go p.peer.RequestNodeProtocolSyncData(data)
                 }
         }
