@@ -16,7 +16,6 @@
 
 package params
 
-// Ether-1 Bootnodes
 var MainnetBootnodes = []string{
 	// Xerom Bootnodes
 	"enode://079763eff99b63261a1804ac5a28401d8d69137106e9022e588041a63c66594af910ffb28984eff4a009553246d5589d4075a61beb0c184a97d4bbdda793ec4a@157.230.144.98:30456",  // Cat -- Checked
