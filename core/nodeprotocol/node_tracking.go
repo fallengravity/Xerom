@@ -138,7 +138,7 @@ func SyncNodeProtocolDataGroup(nodeType string, nodeData map[uint64]NodeData, pe
 
 
         if len(nodeData) > 0 {
-                log.Info("Imported Node Protocol Data", "entries", len(nodeData), "blocks", strconv.FormatUint(smallestBlockNumber, 10) + "->" + strconv.FormatUint(largestBlockNumber, 10))
+                log.Info("Imported Node-Protocol Data", "entries", len(nodeData), "blocks", strconv.FormatUint(smallestBlockNumber, 10) + "->" + strconv.FormatUint(largestBlockNumber, 10))
         }
 }
 

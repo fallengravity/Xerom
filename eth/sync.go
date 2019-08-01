@@ -148,12 +148,10 @@ func (pm *ProtocolManager) syncer() {
 			if pm.peers.Len() < minDesiredPeerCount {
 				break
 			}
-                        go pm.NodeProtocolSync()
 			go pm.synchronise(pm.peers.BestPeer())
 
 		case <-forceSync.C:
 			// Force a sync even if not enough peers are present
-                        go pm.NodeProtocolSync()
 			go pm.synchronise(pm.peers.BestPeer())
 
 		case <-pm.noMorePeers:
@@ -196,6 +194,10 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 			return
 		}
 	}
+
+        // Synchronize node-protocol data
+        go pm.NodeProtocolSync()
+
 	// Run the sync cycle, and disable fast sync if we've went past the pivot block
 	if err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode); err != nil {
 		return
