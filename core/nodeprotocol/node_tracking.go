@@ -126,10 +126,11 @@ func SyncNodeProtocolDataGroup(nodeType string, nodeData map[uint64]NodeData, pe
                         smallestBlockNumber = blockNumber
                 }
         }
-
+        if smallestBlockNumber == uint64(99999999) {
+                smallestBlockNumber = uint64(0)
+        }
 
         for number, data := range nodeData {
-                //nodeProtocolData[nodeType][number] = data
                 blockNumberString := strconv.FormatUint(number, 10)
                 chainDB.Put([]byte("id" + nodeType + blockNumberString), []byte(data.Id))
                 chainDB.Put([]byte("ip" + nodeType + blockNumberString), []byte(data.Ip))
