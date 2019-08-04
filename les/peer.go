@@ -24,8 +24,10 @@ import (
 	"sync"
 	"time"
 
+        mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/les/flowcontrol"
 	"github.com/ethereum/go-ethereum/light"
@@ -243,7 +245,7 @@ func (p *peer) MarkNodeDataMessage(peerId string) {
 	for p.knownNodeDataMessage.Cardinality() >= maxKnownNodeDataMessages {
 		p.knownNodeDataMessage.Pop()
 	}
-        hash, _ := p.Head()
+        hash := p.Head()
 	p.knownNodeDataMessage.Add(peerId + hash.String())
 }
 
@@ -269,12 +271,6 @@ func (p *peer) SendNodeProtocolSyncData(data [][]string) error {
 // SendNodeProtocolPeerVerification verifies a specific peer exists
 func (p *peer) SendNodeProtocolPeerVerification(data []string) error {
 	return p2p.Send(p.rw, SendNodeProtocolPeerVerificationMsg, data)
-}
-
-// SendNodeDataRLP sends a batch of arbitrary internal data, corresponding to the
-// hashes requested.
-func (p *peer) SendNodeData(data [][]byte) error {
-	return p2p.Send(p.rw, NodeDataMsg, data)
 }
 
 // SendAnnounce announces the availability of a number of blocks through
@@ -376,13 +372,6 @@ func (p *peer) RequestNodeProtocolSyncData(data []string) error {
 func (p *peer) RequestNodeProtocolPeerVerification(data []string) error {
 	//p.Log().Debug("Requesting Node Protocol Peer Verification", "Type", data[0], "Hash", data[1], "Number", data[2], "Peer", data[3])
 	return p2p.Send(p.rw, GetNodeProtocolPeerVerificationMsg, data)
-}
-
-// RequestNodeData fetches a batch of arbitrary data from a node's known state
-// data, corresponding to the specified hashes.
-func (p *peer) RequestNodeData(hashes []common.Hash) error {
-	p.Log().Debug("Fetching batch of state data", "count", len(hashes))
-	return p2p.Send(p.rw, GetNodeDataMsg, hashes)
 }
 
 // RequestReceipts fetches a batch of transaction receipts from a remote node.
@@ -773,7 +762,7 @@ func (ps *peerSet) Ips() map[string]string {
         var ipMap map[string]string
         ipMap = make(map[string]string)
 
-        for _, peer := range ps.Peers() {
+        for _, peer := range ps.AllPeers() {
                 peerId := nodeprotocol.GetNodeId(peer.Node())
                 peerIp := peer.Node().IP().String()
                 ipMap[peerId] = peerIp
@@ -817,7 +806,7 @@ func (ps *peerSet) CheckPeerWithoutNodeDataMessage(peerId string, p *peer) bool 
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
-        hash, _ := p.Head()
+        hash := p.Head()
         if !p.knownNodeDataMessage.Contains(peerId + hash.String()) {
 			return true
 	}

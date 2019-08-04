@@ -21,15 +21,18 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+        "math"
 	"math/big"
 	"net"
 	"sync"
 	"time"
+        "strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -61,6 +64,9 @@ const (
 	MaxTxStatus              = 256 // Amount of transactions to queried per request
 
 	disableClientRemovePeer = false
+
+        // minimim number of peers to broadcast new blocks to
+	minBroadcastPeers = 4
 )
 
 func errResp(code errCode, format string, v ...interface{}) error {
@@ -213,7 +219,7 @@ func (pm *ProtocolManager) Stop() {
 
 func (pm *ProtocolManager) NodeProtocolSync() {
         var from uint64
-        currentBlock := pm.blockchain.CurrentBlock().NumberU64()
+        currentBlock := pm.blockchain.CurrentHeader().Number.Uint64()
         if currentBlock > uint64(205) {
                 from = currentBlock - uint64(205)
         } else {
@@ -1399,7 +1405,7 @@ func (pm *ProtocolManager) AsyncGetNodeProtocolData(data []string) {
 }
 
 func (pm *ProtocolManager) AsyncGetNodeProtocolSyncData(data []string) {
-        peers := pm.peers.Peers()
+        peers := pm.peers.AllPeers()
         transferLen := int(math.Sqrt(float64(len(peers))))
         if transferLen < minBroadcastPeers {
                 transferLen = minBroadcastPeers
