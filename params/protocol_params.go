@@ -94,5 +94,5 @@ var (
 	DurationLimit          = big.NewInt(13)           // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not.
 	PenaltySystemBlock     = int64(5000)              // Activatation height of Penalty System.
 	DelayedBlockLength     = uint64(20)               // Threshold number of blocks that can be delayed.
-	NodeProtocolBlock      = int64(400000)            // Activatation height of Node-Protocol System.
+	NodeProtocolBlock      = int64(300000)            // Activatation height of Node-Protocol System.
 )

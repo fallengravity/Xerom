@@ -1,4 +1,5 @@
 // Copyright 2015 The go-ethereum Authors
+// Copyright 2019 The Ether-1 Development Team
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -28,8 +29,10 @@ var pm Manager
 var peerSet PeerSet
 var bc Blockchain
 var SyncWg sync.WaitGroup
+var Syncing bool
 
 type Manager interface {
+        SyncStatus() bool
         AsyncGetNodeProtocolData(data []string)
         AsyncSendNodeProtocolData(data []string)
         AsyncGetNodeProtocolSyncData(data []string)
@@ -111,4 +114,11 @@ func RequestNodeProtocolSyncData(data []string) {
 
 func RequestNodeProtocolPeerVerification(data []string) {
         pm.AsyncGetNodeProtocolPeerVerification(data)
+}
+
+func GetSyncStatus() bool {
+        if Syncing {
+                Syncing = pm.SyncStatus()
+        }
+        return Syncing
 }

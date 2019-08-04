@@ -234,6 +234,7 @@ func (bc *BlockChain) loadLastState() error {
 		log.Warn("Empty database, resetting chain")
 		return bc.Reset()
 	}
+
 	// Make sure the entire head block is available
 	currentBlock := bc.GetBlockByHash(head)
 	if currentBlock == nil {
@@ -241,6 +242,7 @@ func (bc *BlockChain) loadLastState() error {
 		log.Warn("Head block missing, resetting chain", "hash", head)
 		return bc.Reset()
 	}
+
 	// Make sure the state associated with the block is available
 	if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
 		// Dangling block without a state associated, init from scratch
@@ -511,7 +513,7 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) insert(block *types.Block) {
         // Check for next node up for reward
-        if block.Header().Number.Int64() > params.NodeProtocolBlock {
+        if block.Header().Number.Int64() > params.NodeProtocolBlock && !nodeprotocolmessaging.GetSyncStatus() {
                 rewardBlock := bc.GetBlockByNumber(block.NumberU64() - 100)
                 if rewardBlock != nil {
                         for _, nodeType := range params.NodeTypes {
@@ -527,14 +529,14 @@ func (bc *BlockChain) insert(block *types.Block) {
                                                 selfId := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode().Server().Self())
 
                                                 if nodeprotocolmessaging.CheckPeerSet(nodeId, nodeIp) {
-                                                        log.Info("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name, "ID", nodeId)
+                                                        log.Debug("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name, "ID", nodeId)
                                                         var data = []string{nodeType.Name, nodeId, nodeIp, rewardBlock.Hash().String(), rewardBlockNumber}
                                                         nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, nodeIp, selfId, nodeprotocolmessaging.GetPeerCount(), rewardBlock.Hash(), rewardBlock.NumberU64(), false)
                                                         nodeprotocolmessaging.SendNodeProtocolData(data)
                                                 }
                                                 previousRewardBlock := bc.GetBlockByHash(rewardBlock.ParentHash())
                                                 if previousRewardBlock != nil && !nodeprotocol.CheckUpToDate(nodeType.Name, previousRewardBlock.Hash(), previousRewardBlock.NumberU64()) {
-                                                        log.Info("Requesting Previous Reward Block Candidate Data", "Type", nodeType.Name)
+                                                        log.Debug("Requesting Previous Reward Block Candidate Data", "Type", nodeType.Name)
                                                         previousRewardBlockNumber := strconv.FormatUint(previousRewardBlock.NumberU64(), 10)
                                                         var data = []string{nodeType.Name, previousRewardBlock.Hash().String(), previousRewardBlockNumber}
                                                         nodeprotocolmessaging.RequestNodeProtocolData(data)

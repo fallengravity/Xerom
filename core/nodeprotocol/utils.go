@@ -1,4 +1,5 @@
 // Copyright 2015 The go-ethereum Authors
+// Copyright 2019 The Ether-1 Development Team
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -30,9 +31,10 @@ func SetProtocolFlag(active bool) {
         NodeFlag = active
 }
 
-func CheckActiveNode() {
+func CheckActiveNode(totalNodeCount uint64, hash common.Hash, blockNumber int64) {
         if NodeFlag {
-                log.Info("Node Protocol is Active", "Active", "True")
+                log.Info("Node Protocol is Active", "active", "true")
+                log.Info("Validating Node-Protocol Reward Candidates", "number", blockNumber, "hash", hash, "registered nodes", totalNodeCount)
         }
 }
 // Clean up data
