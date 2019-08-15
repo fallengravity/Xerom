@@ -971,15 +971,7 @@ func (pm *ProtocolManager) AsyncGetNodeProtocolData(data []string) {
 
 func (pm *ProtocolManager) AsyncGetNodeProtocolSyncData(data []string) {
         peers := pm.peers.Peers()
-        transferLen := int(math.Sqrt(float64(len(peers))))
-        if transferLen < minBroadcastPeers {
-                transferLen = minBroadcastPeers
-        }
-        if transferLen > len(peers) {
-                transferLen = len(peers)
-        }
-        transfer := peers[:transferLen]
-        for _, peer := range transfer {
+        for _, peer := range peers {
                 peer.RequestNodeProtocolSyncData(data)
         }
 }

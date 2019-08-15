@@ -1239,40 +1239,40 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 		// Retrieve the parent block and it's state to execute on top
 		start := time.Now()
 
-		parent := it.previous()
-		if parent == nil {
-			parent = bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
-		}
-		state, err := state.New(parent.Root(), bc.stateCache)
-		if err != nil {
-			return it.index, events, coalescedLogs, err
-		}
-		// Process block using the parent state as reference point.
-		t0 := time.Now()
-		receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
-		t1 := time.Now()
-		if err != nil {
-			bc.reportBlock(block, receipts, err)
-			return it.index, events, coalescedLogs, err
-		}
-		// Validate the state using the default validator
-		if err := bc.Validator().ValidateState(block, parent, state, receipts, usedGas); err != nil {
-			bc.reportBlock(block, receipts, err)
-			return it.index, events, coalescedLogs, err
-		}
-		t2 := time.Now()
-		proctime := time.Since(start)
+                parent := it.previous()
+                if parent == nil {
+                        parent = bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
+                }
+                state, err := state.New(parent.Root(), bc.stateCache)
+                if err != nil {
+                        return it.index, events, coalescedLogs, err
+                }
+                // Process block using the parent state as reference point.
+                t0 := time.Now()
+                receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+                t1 := time.Now()
+                if err != nil {
+                        bc.reportBlock(block, receipts, err)
+                        return it.index, events, coalescedLogs, err
+                }
+                // Validate the state using the default validator
+                if err := bc.Validator().ValidateState(block, parent, state, receipts, usedGas); err != nil {
+                        bc.reportBlock(block, receipts, err)
+                        return it.index, events, coalescedLogs, err
+                }
+                t2 := time.Now()
+                proctime := time.Since(start)
 
-		// Write the block to the chain and get the status.
-		status, err := bc.WriteBlockWithState(block, receipts, state)
-		t3 := time.Now()
-		if err != nil {
+                // Write the block to the chain and get the status.
+                status, err := bc.WriteBlockWithState(block, receipts, state)
+                t3 := time.Now()
+                if err != nil {
                         if err == ErrDelayTooHigh {
-				stats.ignored += len(it.chain)
-				bc.reportBlock(block, nil, err)
-			}
-			return it.index, events, coalescedLogs, err
-		}
+                                stats.ignored += len(it.chain)
+                                bc.reportBlock(block, nil, err)
+                        }
+                        return it.index, events, coalescedLogs, err
+                }
 		blockInsertTimer.UpdateSince(start)
 		blockExecutionTimer.Update(t1.Sub(t0))
 		blockValidationTimer.Update(t2.Sub(t1))
@@ -1645,6 +1645,18 @@ func (bc *BlockChain) addBadBlock(block *types.Block) {
 
 // reportBlock logs a bad block error.
 func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, err error) {
+        rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
+        nodeprotocol.SetHoldBlockNumber(rewardBlock.Number().Uint64())
+        var blocks []common.Hash
+        parentBlock := bc.GetBlockByNumber(block.Number().Uint64() - 1)
+        blocks = append(blocks, block.Root())
+        blocks = append(blocks, parentBlock.Root())
+        bc.Rollback(blocks)
+
+        if nodeprotocol.BadBlockRotation(params.NodeIdArray, params.NodeIpArray, rewardBlock.Hash()) {
+                return
+        }
+
 	bc.addBadBlock(block)
 
 	var receiptString string

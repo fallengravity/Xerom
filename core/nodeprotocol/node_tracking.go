@@ -24,8 +24,10 @@ import (
         "net/url"
         "net"
         "errors"
+        "strings"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/common"
@@ -38,6 +40,8 @@ var activeNode *node.Node
 var protocolInitiationFlag bool
 var chainDB ethdb.Database
 var SyncStartingBlock uint64
+var HoldBlockNumber string
+var HoldBlockCount int64
 
 type NodeData struct {
         Hash   common.Hash  `json:"hash"`
@@ -104,15 +108,70 @@ func GetNodeProtocolData(nodeType string, blockHash common.Hash, blockNumber uin
         return string(dataId), string(dataIp), nil
 }
 
+func SetHoldBlockNumber(blockNumber uint64) {
+        HoldBlockNumber = strconv.FormatUint(blockNumber, 10)
+}
+
+func BadBlockRotation(nodeIds []string, nodeIps []string, hash common.Hash) bool {
+
+        if HoldBlockCount < 16 && len(nodeIds) == len(params.NodeTypes) && len(nodeIps) == len(params.NodeTypes) {
+                binaryString := strconv.FormatInt(HoldBlockCount, 2)
+                for len(binaryString) < 4 {
+                        binaryString = "0" + binaryString
+                }
+
+                binaryArray := strings.Split(binaryString, "")
+                for key, nodeType := range params.NodeTypes {
+                        RemoveNodeProtocolData(nodeType.Name, nodeIds[key], nodeIps[key], HoldBlockNumber)
+                        if binaryArray[key] == "0" {
+                        } else if binaryArray[key] == "1" {
+                                chainDB.Put([]byte("id" + nodeType.Name + HoldBlockNumber), []byte(nodeIds[key]))
+                                chainDB.Put([]byte("ip" + nodeType.Name + HoldBlockNumber), []byte(nodeIps[key]))
+                                chainDB.Put([]byte("hash" + nodeType.Name + HoldBlockNumber), []byte(hash.String()))
+                                log.Info("Bad Block Rotation - Node Protocol Data Updated", "Type", nodeType.Name, "Hash", hash)
+                        }
+                }
+                HoldBlockCount++
+                return true
+        } else {
+                HoldBlockCount = 0
+                HoldBlockNumber = ""
+                return false
+        }
+        return false
+}
+
 // UpdateNodeProtocolData updates protocol mapping data for verified nodes
 func UpdateNodeProtocolData(nodeType string, nodeId string, nodeIp string, peerId string, peerCount int, blockHash common.Hash, blockNumber uint64, syncing bool) {
+        blockNumberString := strconv.FormatUint(blockNumber, 10)
+
+        if blockNumberString != HoldBlockNumber {
+                chainDB.Put([]byte("id" + nodeType + blockNumberString), []byte(nodeId))
+                chainDB.Put([]byte("ip" + nodeType + blockNumberString), []byte(nodeIp))
+                chainDB.Put([]byte("hash" + nodeType + blockNumberString), []byte(blockHash.String()))
+
+                log.Debug("Node Protocol Data Updated", "Type", nodeType, "Hash", blockHash)
+        }
+}
+
+// ForceUpdateNodeProtocolData updates protocol mapping data for verified nodes
+func ForceUpdateNodeProtocolData(nodeType string, nodeId string, nodeIp string, peerId string, peerCount int, blockHash common.Hash, blockNumber uint64, syncing bool) {
         blockNumberString := strconv.FormatUint(blockNumber, 10)
 
         chainDB.Put([]byte("id" + nodeType + blockNumberString), []byte(nodeId))
         chainDB.Put([]byte("ip" + nodeType + blockNumberString), []byte(nodeIp))
         chainDB.Put([]byte("hash" + nodeType + blockNumberString), []byte(blockHash.String()))
 
-        log.Debug("Node Protocol Data Updated", "Type", nodeType, "ID", nodeId, "IP", nodeIp, "Hash", blockHash)
+        log.Debug("Node Protocol Data Updated", "Type", nodeType, "Hash", blockHash)
+
+}
+
+// RemoveNodeProtocolData updates protocol mapping data for verified nodes
+func RemoveNodeProtocolData(nodeType string, nodeId string, nodeIp string, blockNumberString string) {
+        chainDB.Delete([]byte("id" + nodeType + blockNumberString))
+        chainDB.Delete([]byte("ip" + nodeType + blockNumberString))
+        chainDB.Delete([]byte("hash" + nodeType + blockNumberString))
+        log.Warn("Adjusting Node Protocol Data - Data Removed", "Type", nodeType, "Number", blockNumberString)
 }
 
 // SyncNodeProtocolDataGroup adds a slice of NodeData to state is consenus is reached
@@ -133,9 +192,11 @@ func SyncNodeProtocolDataGroup(nodeType string, nodeData map[uint64]NodeData, pe
 
         for number, data := range nodeData {
                 blockNumberString := strconv.FormatUint(number, 10)
-                chainDB.Put([]byte("id" + nodeType + blockNumberString), []byte(data.Id))
-                chainDB.Put([]byte("ip" + nodeType + blockNumberString), []byte(data.Ip))
-                chainDB.Put([]byte("hash" + nodeType + blockNumberString), []byte(data.Hash.String()))
+                if blockNumberString != HoldBlockNumber {
+                        chainDB.Put([]byte("id" + nodeType + blockNumberString), []byte(data.Id))
+                        chainDB.Put([]byte("ip" + nodeType + blockNumberString), []byte(data.Ip))
+                        chainDB.Put([]byte("hash" + nodeType + blockNumberString), []byte(data.Hash.String()))
+                }
         }
 
 
