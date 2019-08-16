@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 	"time"
         "strconv"
+        "strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -1226,6 +1227,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 	}
 	// No validation errors for the first block (or chain prefix skipped)
 	for ; block != nil && err == nil; block, err = it.next() {
+                Start:
 		// If the chain is terminating, stop processing blocks
 		if atomic.LoadInt32(&bc.procInterrupt) == 1 {
 			log.Debug("Premature abort during blocks processing")
@@ -1257,6 +1259,11 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
                 }
                 // Validate the state using the default validator
                 if err := bc.Validator().ValidateState(block, parent, state, receipts, usedGas); err != nil {
+                        if block.Number().Int64() > params.NodeProtocolBlock {
+                                if bc.rotateBlockData(block) {
+                                        goto Start
+                                }
+                        }
                         bc.reportBlock(block, receipts, err)
                         return it.index, events, coalescedLogs, err
                 }
@@ -1269,10 +1276,16 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
                 if err != nil {
                         if err == ErrDelayTooHigh {
                                 stats.ignored += len(it.chain)
+                                log.Error("Report Block Debug", "Error", "Delay")
                                 bc.reportBlock(block, nil, err)
                         }
                         return it.index, events, coalescedLogs, err
                 }
+
+                if block.Number().Int64() > params.NodeProtocolBlock {
+                        bc.checkBlockDataRotation(block)
+                }
+
 		blockInsertTimer.UpdateSince(start)
 		blockExecutionTimer.Update(t1.Sub(t0))
 		blockValidationTimer.Update(t2.Sub(t1))
@@ -1643,20 +1656,47 @@ func (bc *BlockChain) addBadBlock(block *types.Block) {
 	bc.badBlocks.Add(block.Hash(), block)
 }
 
-// reportBlock logs a bad block error.
-func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, err error) {
+func (bc *BlockChain) rotateBlockData(block *types.Block) bool {
         rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
         nodeprotocol.SetHoldBlockNumber(rewardBlock.Number().Uint64())
-        var blocks []common.Hash
-        parentBlock := bc.GetBlockByNumber(block.Number().Uint64() - 1)
-        blocks = append(blocks, block.Root())
-        blocks = append(blocks, parentBlock.Root())
-        bc.Rollback(blocks)
-
+        //var blocks []common.Hash
+        //parentBlock := bc.GetBlockByNumber(block.Number().Uint64() - 1)
+        //blocks = append(blocks, block.Root())
+        //blocks = append(blocks, parentBlock.Root())
+        //bc.Rollback(blocks)
         if nodeprotocol.BadBlockRotation(params.NodeIdArray, params.NodeIpArray, rewardBlock.Hash()) {
-                return
+                return true
+        }
+        return false
+}
+
+func (bc *BlockChain) checkBlockDataRotation(block *types.Block) {
+        rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
+        rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
+        var holdBlockCount int64
+        if nodeprotocol.HoldBlockCount > 0 && nodeprotocol.HoldBlockNumber != "" {
+                holdBlockCount = nodeprotocol.HoldBlockCount - 1
+                nodeprotocol.ResetHoldBlockCount()
+        } else {
+               return
         }
 
+        // Determiner binary string here
+        binaryString := strconv.FormatInt(holdBlockCount, 2)
+        for len(binaryString) < 4 {
+                binaryString = "0" + binaryString
+        }
+        binaryArray := strings.Split(binaryString, "")
+        for key, nodeType := range params.NodeTypes {
+                if binaryArray[key] == "1" {
+                        var data = []string{nodeType.Name, params.NodeIdArray[key], params.NodeIpArray[key], rewardBlock.Hash().String(), rewardBlockNumber}
+                        nodeprotocolmessaging.SendNodeProtocolData(data)
+                }
+        }
+}
+
+// reportBlock logs a bad block error.
+func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, err error) {
 	bc.addBadBlock(block)
 
 	var receiptString string

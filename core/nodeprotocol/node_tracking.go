@@ -112,6 +112,10 @@ func SetHoldBlockNumber(blockNumber uint64) {
         HoldBlockNumber = strconv.FormatUint(blockNumber, 10)
 }
 
+func ResetHoldBlockCount() {
+        HoldBlockCount = 0
+}
+
 func BadBlockRotation(nodeIds []string, nodeIps []string, hash common.Hash) bool {
 
         if HoldBlockCount < 16 && len(nodeIds) == len(params.NodeTypes) && len(nodeIps) == len(params.NodeTypes) {
@@ -133,10 +137,10 @@ func BadBlockRotation(nodeIds []string, nodeIps []string, hash common.Hash) bool
                 }
                 HoldBlockCount++
                 return true
-        } else {
-                HoldBlockCount = 0
-                HoldBlockNumber = ""
-                return false
+        //} else {
+        //        HoldBlockCount = 0
+        //        HoldBlockNumber = ""
+        //        return false
         }
         return false
 }
