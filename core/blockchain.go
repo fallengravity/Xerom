@@ -27,7 +27,6 @@ import (
 	"sync/atomic"
 	"time"
         "strconv"
-        "strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -1668,16 +1667,17 @@ func (bc *BlockChain) rotateBlockData(block *types.Block) bool {
 
 // checkBlockDataRotation validates the node reward solver and broadcasts
 func (bc *BlockChain) checkBlockDataRotation(block *types.Block) {
-        rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
-        rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
-        var holdBlockCount int64
+        //rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
+        //rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
+        //var holdBlockCount int64
         if nodeprotocol.HoldBlockCount > 0 && nodeprotocol.HoldBlockNumber != "" {
-                holdBlockCount = nodeprotocol.HoldBlockCount - 1
+               // holdBlockCount = nodeprotocol.HoldBlockCount - 1
                 nodeprotocol.ResetHoldBlockCount()
         } else {
                return
         }
 
+        /*
         // Determine binary string for node reward block solution
         binaryString := strconv.FormatInt(holdBlockCount, 2)
         for len(binaryString) < 4 {
@@ -1689,7 +1689,7 @@ func (bc *BlockChain) checkBlockDataRotation(block *types.Block) {
                         var data = []string{nodeType.Name, params.NodeIdArray[key], params.NodeIpArray[key], rewardBlock.Hash().String(), rewardBlockNumber}
                         nodeprotocolmessaging.SendNodeProtocolData(data)
                 }
-        }
+        }*/
 }
 
 // reportBlock logs a bad block error.
