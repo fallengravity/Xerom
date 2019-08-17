@@ -441,7 +441,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         return errResp(ErrDecode, "msg %v: %v", msg, err)
                 }
                 if len(nodeProtocolData) == 3 {
-                        nodeType := nodeProtocolData[0]
+                        /*nodeType := nodeProtocolData[0]
                         startingBlockNumber,_ := strconv.ParseUint(nodeProtocolData[1], 10, 64)
                         blockCount,_ := strconv.ParseUint(nodeProtocolData[2], 10, 64)
                         hashData, nodeData, blockData, ipData, _ := nodeprotocol.GetNodeProtocolDataGroup(nodeType, startingBlockNumber, (startingBlockNumber + blockCount))
@@ -454,7 +454,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         if nodeDataLength == hashDataLength && hashDataLength == blockDataLength && blockDataLength == ipDataLength {
                                 var data = [][]string{[]string{nodeType}, nodeData, hashData, blockData, ipData}
                                 p.SendNodeProtocolSyncData(data)
-                        }
+                        }*/
                 }
                 return nil
 
@@ -524,7 +524,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 
                 if len(nodeProtocolData) != 5 {
                         log.Error("Incorrectly Formatted Node Protocol Data Message Received")
-                } else {
+                } else if pm.peers.CheckPeerWithoutNodeDataMessage(nodeProtocolData[1] + nodeProtocolData[0], p) {
+                        p.MarkNodeDataMessage(nodeProtocolData[1] + nodeProtocolData[0])
+
                         log.Trace("Receieved Node Protocol Data Message", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[3], "Number", nodeProtocolData[4], "ID", nodeProtocolData[1], "IP", nodeProtocolData[2])
 	                // Check if we have updated node protocol data
                         blockNumber,_ := strconv.ParseUint(nodeProtocolData[4], 10, 64)
@@ -938,11 +940,9 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 }
 
 func (pm *ProtocolManager) AsyncSendNodeProtocolData(data []string) {
-        //blockNumber,_ := strconv.ParseUint(data[3], 10, 64)
         blockNumber := data[4]
         nodeType := data[0]
 	peers := pm.peers.PeersWithoutNodeData(nodeType + blockNumber)
-	//peers := pm.peers.Peers()
         for _, peer := range peers {
 		peer.SendNodeProtocolData(data)
                 peer.MarkNodeData(nodeType + blockNumber)
@@ -965,23 +965,15 @@ func (pm *ProtocolManager) AsyncGetNodeProtocolPeerVerification(data []string) {
 }
 
 func (pm *ProtocolManager) AsyncGetNodeProtocolData(data []string) {
-        peer := pm.peers.BestPeer()
-        peer.RequestNodeProtocolData(data)
+        if len(pm.peers.peers) > 0 {
+                peer := pm.peers.BestPeer()
+                peer.RequestNodeProtocolData(data)
+        }
 }
 
 func (pm *ProtocolManager) AsyncGetNodeProtocolSyncData(data []string) {
-        peers := pm.peers.Peers()
-        transferLen := int(math.Sqrt(float64(len(peers))))
-        if transferLen < minBroadcastPeers {
-                transferLen = minBroadcastPeers
-        }
-        if transferLen > len(peers) {
-                transferLen = len(peers)
-        }
-        transfer := peers[:transferLen]
-        for _, peer := range transfer {
-                peer.RequestNodeProtocolSyncData(data)
-        }
+        peer := pm.peers.BestPeer()
+        peer.RequestNodeProtocolSyncData(data)
 }
 
 // BroadcastTxs will propagate a batch of transactions to all peers which are not known to

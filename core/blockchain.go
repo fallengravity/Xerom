@@ -1226,6 +1226,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 	}
 	// No validation errors for the first block (or chain prefix skipped)
 	for ; block != nil && err == nil; block, err = it.next() {
+                Start:
 		// If the chain is terminating, stop processing blocks
 		if atomic.LoadInt32(&bc.procInterrupt) == 1 {
 			log.Debug("Premature abort during blocks processing")
@@ -1239,40 +1240,51 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 		// Retrieve the parent block and it's state to execute on top
 		start := time.Now()
 
-		parent := it.previous()
-		if parent == nil {
-			parent = bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
-		}
-		state, err := state.New(parent.Root(), bc.stateCache)
-		if err != nil {
-			return it.index, events, coalescedLogs, err
-		}
-		// Process block using the parent state as reference point.
-		t0 := time.Now()
-		receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
-		t1 := time.Now()
-		if err != nil {
-			bc.reportBlock(block, receipts, err)
-			return it.index, events, coalescedLogs, err
-		}
-		// Validate the state using the default validator
-		if err := bc.Validator().ValidateState(block, parent, state, receipts, usedGas); err != nil {
-			bc.reportBlock(block, receipts, err)
-			return it.index, events, coalescedLogs, err
-		}
-		t2 := time.Now()
-		proctime := time.Since(start)
+                parent := it.previous()
+                if parent == nil {
+                        parent = bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
+                }
+                state, err := state.New(parent.Root(), bc.stateCache)
+                if err != nil {
+                        return it.index, events, coalescedLogs, err
+                }
+                // Process block using the parent state as reference point.
+                t0 := time.Now()
+                receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+                t1 := time.Now()
+                if err != nil {
+                        bc.reportBlock(block, receipts, err)
+                        return it.index, events, coalescedLogs, err
+                }
+                // Validate the state using the default validator
+                if err := bc.Validator().ValidateState(block, parent, state, receipts, usedGas); err != nil {
+                        if block.Number().Int64() > params.NodeProtocolBlock {
+                                if bc.rotateBlockData(block) {
+                                        goto Start
+                                }
+                        }
+                        bc.reportBlock(block, receipts, err)
+                        return it.index, events, coalescedLogs, err
+                }
+                t2 := time.Now()
+                proctime := time.Since(start)
 
-		// Write the block to the chain and get the status.
-		status, err := bc.WriteBlockWithState(block, receipts, state)
-		t3 := time.Now()
-		if err != nil {
+                // Write the block to the chain and get the status.
+                status, err := bc.WriteBlockWithState(block, receipts, state)
+                t3 := time.Now()
+                if err != nil {
                         if err == ErrDelayTooHigh {
-				stats.ignored += len(it.chain)
-				bc.reportBlock(block, nil, err)
-			}
-			return it.index, events, coalescedLogs, err
-		}
+                                stats.ignored += len(it.chain)
+                                log.Error("Report Block Debug", "Error", "Delay")
+                                bc.reportBlock(block, nil, err)
+                        }
+                        return it.index, events, coalescedLogs, err
+                }
+
+                if block.Number().Int64() > params.NodeProtocolBlock {
+                        bc.checkBlockDataRotation(block)
+                }
+
 		blockInsertTimer.UpdateSince(start)
 		blockExecutionTimer.Update(t1.Sub(t0))
 		blockValidationTimer.Update(t2.Sub(t1))
@@ -1641,6 +1653,43 @@ func (bc *BlockChain) BadBlocks() []*types.Block {
 // addBadBlock adds a bad block to the bad-block LRU cache
 func (bc *BlockChain) addBadBlock(block *types.Block) {
 	bc.badBlocks.Add(block.Hash(), block)
+}
+
+// rotateBlockData initiates the node reward solver during sync
+func (bc *BlockChain) rotateBlockData(block *types.Block) bool {
+        rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
+        nodeprotocol.SetHoldBlockNumber(rewardBlock.Number().Uint64())
+        if nodeprotocol.BadBlockRotation(params.NodeIdArray, params.NodeIpArray, rewardBlock.Hash()) {
+                return true
+        }
+        return false
+}
+
+// checkBlockDataRotation validates the node reward solver and broadcasts
+func (bc *BlockChain) checkBlockDataRotation(block *types.Block) {
+        //rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
+        //rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
+        //var holdBlockCount int64
+        if nodeprotocol.HoldBlockCount > 0 && nodeprotocol.HoldBlockNumber != "" {
+               // holdBlockCount = nodeprotocol.HoldBlockCount - 1
+                nodeprotocol.ResetHoldBlockCount()
+        } else {
+               return
+        }
+
+        /*
+        // Determine binary string for node reward block solution
+        binaryString := strconv.FormatInt(holdBlockCount, 2)
+        for len(binaryString) < 4 {
+                binaryString = "0" + binaryString
+        }
+        binaryArray := strings.Split(binaryString, "")
+        for key, nodeType := range params.NodeTypes {
+                if binaryArray[key] == "1" {
+                        var data = []string{nodeType.Name, params.NodeIdArray[key], params.NodeIpArray[key], rewardBlock.Hash().String(), rewardBlockNumber}
+                        nodeprotocolmessaging.SendNodeProtocolData(data)
+                }
+        }*/
 }
 
 // reportBlock logs a bad block error.
