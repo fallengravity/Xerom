@@ -1656,20 +1656,17 @@ func (bc *BlockChain) addBadBlock(block *types.Block) {
 	bc.badBlocks.Add(block.Hash(), block)
 }
 
+// rotateBlockData initiates the node reward solver during sync
 func (bc *BlockChain) rotateBlockData(block *types.Block) bool {
         rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
         nodeprotocol.SetHoldBlockNumber(rewardBlock.Number().Uint64())
-        //var blocks []common.Hash
-        //parentBlock := bc.GetBlockByNumber(block.Number().Uint64() - 1)
-        //blocks = append(blocks, block.Root())
-        //blocks = append(blocks, parentBlock.Root())
-        //bc.Rollback(blocks)
         if nodeprotocol.BadBlockRotation(params.NodeIdArray, params.NodeIpArray, rewardBlock.Hash()) {
                 return true
         }
         return false
 }
 
+// checkBlockDataRotation validates the node reward solver and broadcasts
 func (bc *BlockChain) checkBlockDataRotation(block *types.Block) {
         rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
         rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
@@ -1681,7 +1678,7 @@ func (bc *BlockChain) checkBlockDataRotation(block *types.Block) {
                return
         }
 
-        // Determiner binary string here
+        // Determine binary string for node reward block solution
         binaryString := strconv.FormatInt(holdBlockCount, 2)
         for len(binaryString) < 4 {
                 binaryString = "0" + binaryString

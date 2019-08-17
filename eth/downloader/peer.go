@@ -28,12 +28,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-        "strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-        "github.com/ethereum/go-ethereum/params"
 )
 
 const (
@@ -161,20 +159,6 @@ func (p *peerConnection) FetchHeaders(from uint64, count int) error {
 	}
 	p.headerStarted = time.Now()
 
-        nodeProtocolFrom := from
-        if nodeProtocolFrom >= uint64(105) {
-                nodeProtocolFrom = nodeProtocolFrom - uint64(105)
-        } else {
-                nodeProtocolFrom = uint64(0)
-        }
-
-        if (int64(nodeProtocolFrom) + int64(count)) > (params.NodeProtocolBlock - int64(5000)) {
-                for _, nodeType := range params.NodeTypes {
-                        data := []string{nodeType.Name, strconv.FormatUint((nodeProtocolFrom), 10), strconv.FormatUint(uint64(count + 105), 10)}
-                        go p.peer.RequestNodeProtocolSyncData(data)
-                }
-        }
-
 	// Issue the header retrieval request (absolut upwards without gaps)
 	go p.peer.RequestHeadersByNumber(from, count, 0, false)
 
@@ -198,6 +182,7 @@ func (p *peerConnection) FetchBodies(request *fetchRequest) error {
 	for _, header := range request.Headers {
 		hashes = append(hashes, header.Hash())
 	}
+
 	go p.peer.RequestBodies(hashes)
 
 	return nil

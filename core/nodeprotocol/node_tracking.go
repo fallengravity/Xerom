@@ -108,10 +108,12 @@ func GetNodeProtocolData(nodeType string, blockHash common.Hash, blockNumber uin
         return string(dataId), string(dataIp), nil
 }
 
+// Set bad bloc data tracker by block number
 func SetHoldBlockNumber(blockNumber uint64) {
         HoldBlockNumber = strconv.FormatUint(blockNumber, 10)
 }
 
+// Reset bad block data tracking
 func ResetHoldBlockCount() {
         HoldBlockCount = 0
 }
@@ -132,15 +134,11 @@ func BadBlockRotation(nodeIds []string, nodeIps []string, hash common.Hash) bool
                                 chainDB.Put([]byte("id" + nodeType.Name + HoldBlockNumber), []byte(nodeIds[key]))
                                 chainDB.Put([]byte("ip" + nodeType.Name + HoldBlockNumber), []byte(nodeIps[key]))
                                 chainDB.Put([]byte("hash" + nodeType.Name + HoldBlockNumber), []byte(hash.String()))
-                                log.Info("Bad Block Rotation - Node Protocol Data Updated", "Type", nodeType.Name, "Hash", hash)
+                                log.Debug("Bad Block Rotation - Node Protocol Data Updated", "Type", nodeType.Name, "Hash", hash)
                         }
                 }
                 HoldBlockCount++
                 return true
-        //} else {
-        //        HoldBlockCount = 0
-        //        HoldBlockNumber = ""
-        //        return false
         }
         return false
 }
@@ -175,7 +173,7 @@ func RemoveNodeProtocolData(nodeType string, nodeId string, nodeIp string, block
         chainDB.Delete([]byte("id" + nodeType + blockNumberString))
         chainDB.Delete([]byte("ip" + nodeType + blockNumberString))
         chainDB.Delete([]byte("hash" + nodeType + blockNumberString))
-        log.Warn("Adjusting Node Protocol Data - Data Removed", "Type", nodeType, "Number", blockNumberString)
+        log.Debug("Adjusting Node Protocol Data - Data Removed", "Type", nodeType, "Number", blockNumberString)
 }
 
 // SyncNodeProtocolDataGroup adds a slice of NodeData to state is consenus is reached
