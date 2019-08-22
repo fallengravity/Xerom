@@ -93,7 +93,7 @@ func getNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 
 	nodeIdLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(2))).Bytes()
 
-	// Get offsets for long enodeid string
+	// Get offsets for a long enodeid string
 	hash = sha3.NewKeccak256()
 	var buf1 []byte
 	hash.Write(nodeIdLocation)
@@ -106,7 +106,7 @@ func getNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 	nodeAddressLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(1)))
         nodeIpLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(3)))
 
-	// Get storage state form db using the hashed data
+	// Get storage state from the db using the hashed data
 	responseNodeId1 := state.GetState(contractAddress, finalNodeIdLocation1)
 	responseNodeId2 := state.GetState(contractAddress, finalNodeIdLocation2)
 	responseNodeId3 := state.GetState(contractAddress, finalNodeIdLocation3)

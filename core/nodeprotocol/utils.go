@@ -28,15 +28,16 @@ import (
 var NodeFlag bool
 
 func SetProtocolFlag(active bool) {
-        NodeFlag = active
+	NodeFlag = active
 }
 
 func CheckActiveNode(totalNodeCount uint64, hash common.Hash, blockNumber int64) {
-        if NodeFlag {
-                log.Info("Node Protocol is Active", "active", "true")
-                log.Info("Validating Node-Protocol Reward Candidates", "number", blockNumber, "hash", hash, "registered nodes", totalNodeCount)
-        }
+	if NodeFlag {
+		log.Info("Node Protocol is Active", "active", "true")
+		log.Info("Validating Node-Protocol Reward Candidates", "number", blockNumber, "hash", hash, "registered nodes", totalNodeCount)
+	}
 }
+
 // Clean up data
 func stripCtlAndExtFromBytes(str string) string {
 	b := make([]byte, len(str))
@@ -51,14 +52,14 @@ func stripCtlAndExtFromBytes(str string) string {
 	return string(b[:bl])
 }
 
-// Calculate and return node remainder balance payment share
+// Calculate and return node remainder balance for payment share
 func GetNodeRemainder(state *state.StateDB, nodeCount uint64, remainderAddress common.Address) *big.Int {
 
 	remainderBalance := state.GetBalance(remainderAddress)
 
 	if remainderBalance.Cmp(big.NewInt(0)) > 0 && nodeCount > 0 {
 
-                // Disburse remainder funds over extended period using a full days block count as divisor
+		// Disburse remainder funds over extended period using a full days block count as divisor
 		var remainderPayment *big.Int
 		remainderPayment = new(big.Int).Div(remainderBalance, big.NewInt(6646))
 

@@ -62,7 +62,7 @@ func SetActiveNode(stack *node.Node) {
 	activeNode = stack
 }
 
-// CheckNodeStatus checks to see if specified node has been validated
+// CheckNodeStatus checks to see if the specified node has been validated
 func CheckNodeStatus(nodeType string, nodeId common.Hash, nodeIp common.Hash, blockHash common.Hash, blockNumber uint64) bool {
         blockNumberString := strconv.FormatUint(blockNumber, 10)
 
@@ -79,7 +79,7 @@ func CheckNodeStatus(nodeType string, nodeId common.Hash, nodeIp common.Hash, bl
         return false
 }
 
-// CheckUpToDate checks to see if blockHash has been recorded in mapping
+// CheckUpToDate checks to see if blockHash has been recorded in the mapping
 func CheckUpToDate(nodeType string, blockHash common.Hash, blockNumber uint64) bool {
         blockNumberString := strconv.FormatUint(blockNumber, 10)
 
@@ -108,7 +108,7 @@ func GetNodeProtocolData(nodeType string, blockHash common.Hash, blockNumber uin
         return string(dataId), string(dataIp), nil
 }
 
-// Set bad bloc data tracker by block number
+// Set bad block data tracker by block number
 func SetHoldBlockNumber(blockNumber uint64) {
         HoldBlockNumber = strconv.FormatUint(blockNumber, 10)
 }
@@ -176,7 +176,7 @@ func RemoveNodeProtocolData(nodeType string, nodeId string, nodeIp string, block
         log.Debug("Adjusting Node Protocol Data - Data Removed", "Type", nodeType, "Number", blockNumberString)
 }
 
-// SyncNodeProtocolDataGroup adds a slice of NodeData to state is consenus is reached
+// SyncNodeProtocolDataGroup adds a slice of NodeData to state if consensus is reached
 func SyncNodeProtocolDataGroup(nodeType string, nodeData map[uint64]NodeData, peerId string, peerCount int) {
 
         largestBlockNumber := uint64(0)
@@ -230,7 +230,7 @@ func GetNodeProtocolDataGroup(nodeType string, startBlock uint64, endBlock uint6
         return hashes, nodes, numbers, ips, nil
 }
 
-// GetNodeId return enodeid in string format from *enode.Node
+// GetNodeId return enodeid in a string format from *enode.Node
 func GetNodeId(n *enode.Node) string {
         var (
                 scheme enr.ID
