@@ -115,9 +115,9 @@ var (
 	// MainnetTrustedCheckpoint contains the light client trusted checkpoint for the main network.
 	MainnetTrustedCheckpoint = &TrustedCheckpoint{
 		Name:         "mainnet",
-		SectionIndex: 5,
-		SectionHead:  common.HexToHash("0x7045c55f81f045fe8747a87fab52f209e56d560423eff057e47872ef880c8767"),
-		CHTRoot:      common.HexToHash("0x493b23a2a287e2c490d8ce3051f2f8383843c1193bd9bb4d352b302af1cc0763"),
+		SectionIndex: 13,
+		SectionHead:  common.HexToHash("0x3caf4a609adf4c9652a267d80a41da54d28ba377550e71e7589787985ccf2a39"),
+		CHTRoot:      common.HexToHash("0x7d80fdfd5ab648a3f489bb6b9754f85467216afb9aef42757fef39986de106b6"),
 		BloomRoot:    common.HexToHash("0xe34a18fe6db5f65daf259afd7b8b7acf0cf630286670c2b294c8fd448aeb1b3a"),
 	}
 
