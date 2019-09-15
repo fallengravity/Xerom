@@ -129,8 +129,8 @@ func BadBlockRotation(nodeIds []string, nodeIps []string, hash common.Hash) bool
                 binaryArray := strings.Split(binaryString, "")
                 for key, nodeType := range params.NodeTypes {
                         RemoveNodeProtocolData(nodeType.Name, nodeIds[key], nodeIps[key], HoldBlockNumber)
-                        if binaryArray[key] == "0" {
-                        } else if binaryArray[key] == "1" {
+                        if binaryArray[key] == "1" {
+                        } else if binaryArray[key] == "0" {
                                 chainDB.Put([]byte("id" + nodeType.Name + HoldBlockNumber), []byte(nodeIds[key]))
                                 chainDB.Put([]byte("ip" + nodeType.Name + HoldBlockNumber), []byte(nodeIps[key]))
                                 chainDB.Put([]byte("hash" + nodeType.Name + HoldBlockNumber), []byte(hash.String()))
