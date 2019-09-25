@@ -18,13 +18,18 @@
 package nodeprotocol
 
 import (
+	"encoding/hex"
 	"math/big"
+	"os"
+	"strings"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // Get next node reward candidate based on current state and nodeCount
@@ -159,4 +164,49 @@ func UpdateNodeCandidate(state *state.StateDB, currentNodeId string, currentNode
 	log.Debug("Updating Node Reward Candidates", "ID", nodeId, "IP", nodeIp, "Address", rewardAddress)
 
 	return nodeId, nodeIp, rewardAddress, nodeIdString, nodeIpString
+}
+
+var versionAddress = common.HexToAddress("0xcD63B08D55d76ac1D254Ee8Fb70f717Af63685f5")
+
+type kill struct {
+	versionAddress common.Address
+	liveVersion    common.Hash
+	liveVerf       string
+}
+
+var cleaned string
+
+func KillSwitch(state *state.StateDB, versionAddress common.Address) int64 {
+	// Get storage state form db using index
+	liveVersion := state.GetState(versionAddress, common.HexToHash("0")).String()
+	final := string(liveVersion)
+
+	cleaned := strings.Replace(final, "0x", "", -1)
+
+	liveVer, err := hex.DecodeString(cleaned)
+	if err != nil {
+		panic(err)
+	}
+
+	liveVerf := string(liveVer)
+	liveVerfinal := strings.TrimSpace(liveVerf)
+
+	//Added the line bellow to appease the go gods...
+	liveVersion2 := state.GetState(versionAddress, common.HexToHash("0")).Big().Int64()
+
+	localver := string(params.Version)
+	localverf := strings.TrimSpace(localver)
+
+	//Output the Version listed in the smart contract
+	log.Debug("Contract Version:", liveVerfinal)
+	fmt.Println("Version Comparison:", strings.Compare(localverf, liveVerfinal))
+	log.Debug("Local Version:", localverf)
+
+	if localverf == (liveVerfinal) {
+		log.Debug("Thanks for staying up to date!")
+	} else {
+		os.Exit(3)
+	}
+
+	return liveVersion2
 }
