@@ -18,11 +18,11 @@
 package nodeprotocolmessaging
 
 import (
-        "sync"
+	"sync"
 
-        "github.com/ethereum/go-ethereum/common"
-        "github.com/ethereum/go-ethereum/core/state"
-        "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 var pm Manager
@@ -32,93 +32,93 @@ var SyncWg sync.WaitGroup
 var Syncing bool
 
 type Manager interface {
-        SyncStatus() bool
-        AsyncGetNodeProtocolData(data []string)
-        AsyncSendNodeProtocolData(data []string)
-        AsyncGetNodeProtocolSyncData(data []string)
-        AsyncGetNodeProtocolPeerVerification(data []string)
+	SyncStatus() bool
+	AsyncGetNodeProtocolData(data []string)
+	AsyncSendNodeProtocolData(data []string)
+	AsyncGetNodeProtocolSyncData(data []string)
+	AsyncGetNodeProtocolPeerVerification(data []string)
 }
 
 type PeerSet interface {
-        Len() int
-        String() []string
-        Ips() map[string]string
+	Len() int
+	String() []string
+	Ips() map[string]string
 }
 
 type Blockchain interface {
-        StateAt(hash common.Hash) (*state.StateDB, error)
-        Rollback(chain []common.Hash) 
-        GetBlockByNumber(number uint64) *types.Block
-        CurrentBlock() *types.Block
-        GetBlockByHash(hash common.Hash) *types.Block
+	StateAt(hash common.Hash) (*state.StateDB, error)
+	Rollback(chain []common.Hash)
+	GetBlockByNumber(number uint64) *types.Block
+	CurrentBlock() *types.Block
+	GetBlockByHash(hash common.Hash) *types.Block
 }
 
 func SetBlockchain(blockchain Blockchain) {
-        bc = blockchain
+	bc = blockchain
 }
 
 func GetStateAt(hash common.Hash) (*state.StateDB, error) {
-        return bc.StateAt(hash)
+	return bc.StateAt(hash)
 }
 
 func GetBlockByHash(hash common.Hash) *types.Block {
-        return bc.GetBlockByHash(hash)
+	return bc.GetBlockByHash(hash)
 }
 
 func SetProtocolManager(manager Manager) {
-        pm = manager
+	pm = manager
 }
 
 func SetPeerSet(ps PeerSet) {
-       peerSet = ps
+	peerSet = ps
 }
 
 func RollBackChain(count uint64) {
-        var chain []common.Hash
-        currentBlockNumber := bc.CurrentBlock().Header().Number.Uint64()
-        for i := uint64(0); i < count; i++ {
-                hash := bc.GetBlockByNumber(currentBlockNumber - i).Hash()
-                chain = append(chain, hash)
-        }
-        bc.Rollback(chain)
+	var chain []common.Hash
+	currentBlockNumber := bc.CurrentBlock().Header().Number.Uint64()
+	for i := uint64(0); i < count; i++ {
+		hash := bc.GetBlockByNumber(currentBlockNumber - i).Hash()
+		chain = append(chain, hash)
+	}
+	bc.Rollback(chain)
 }
 
 func CheckPeerSet(id string, ip string) bool {
-        ipMap := peerSet.Ips()
-        for _, peerId := range peerSet.String() {
-                if peerIp, ok := ipMap[peerId]; ok {
-                        // Return true if peer is found
-                        if id == peerId && ip == peerIp {
-                                return true
-                        }
-                }
-        }
-        return false
+	ipMap := peerSet.Ips()
+	for _, peerId := range peerSet.String() {
+		if peerIp, ok := ipMap[peerId]; ok {
+			// Return true if peer is found
+			if id == peerId && ip == peerIp {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func GetPeerCount() int {
-        return peerSet.Len()
+	return peerSet.Len()
 }
 
 func RequestNodeProtocolData(data []string) {
-        pm.AsyncGetNodeProtocolData(data)
+	pm.AsyncGetNodeProtocolData(data)
 }
 
 func SendNodeProtocolData(data []string) {
-        pm.AsyncSendNodeProtocolData(data)
+	pm.AsyncSendNodeProtocolData(data)
 }
 
 func RequestNodeProtocolSyncData(data []string) {
-        pm.AsyncGetNodeProtocolSyncData(data)
+	pm.AsyncGetNodeProtocolSyncData(data)
 }
 
 func RequestNodeProtocolPeerVerification(data []string) {
-        pm.AsyncGetNodeProtocolPeerVerification(data)
+	pm.AsyncGetNodeProtocolPeerVerification(data)
 }
 
 func GetSyncStatus() bool {
-        if Syncing {
-                Syncing = pm.SyncStatus()
-        }
-        return Syncing
+	if Syncing {
+		Syncing = pm.SyncStatus()
+	}
+	return Syncing
 }

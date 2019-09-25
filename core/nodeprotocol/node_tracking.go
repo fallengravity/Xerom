@@ -18,22 +18,22 @@
 package nodeprotocol
 
 import (
- 	"fmt"
-        "strconv"
-        "crypto/ecdsa"
-        "net/url"
-        "net"
-        "errors"
-        "strings"
+	"crypto/ecdsa"
+	"errors"
+	"fmt"
+	"net"
+	"net/url"
+	"strconv"
+	"strings"
 
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-        "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enr"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 var activeNode *node.Node
@@ -44,10 +44,10 @@ var HoldBlockNumber string
 var HoldBlockCount int64
 
 type NodeData struct {
-        Hash   common.Hash  `json:"hash"`
-        Id     string       `json:"id"`
-        Number uint64       `json:"number"`
-        Ip     string       `json:"ip"`
+	Hash   common.Hash `json:"hash"`
+	Id     string      `json:"id"`
+	Number uint64      `json:"number"`
+	Ip     string      `json:"ip"`
 }
 
 func ActiveNode() *node.Node {
@@ -55,7 +55,7 @@ func ActiveNode() *node.Node {
 }
 
 func SetChainDB(db ethdb.Database) {
-        chainDB = db
+	chainDB = db
 }
 
 func SetActiveNode(stack *node.Node) {
@@ -64,198 +64,197 @@ func SetActiveNode(stack *node.Node) {
 
 // CheckNodeStatus checks to see if the specified node has been validated
 func CheckNodeStatus(nodeType string, nodeId common.Hash, nodeIp common.Hash, blockHash common.Hash, blockNumber uint64) bool {
-        blockNumberString := strconv.FormatUint(blockNumber, 10)
+	blockNumberString := strconv.FormatUint(blockNumber, 10)
 
-        dataId, errId := chainDB.Get([]byte("id" + nodeType + blockNumberString))
-        dataIp, errIp := chainDB.Get([]byte("ip" + nodeType + blockNumberString))
-        dataHash, errHash := chainDB.Get([]byte("hash" + nodeType + blockNumberString))
-        if errId == nil && errIp == nil && errHash == nil{
-                if nodeId == common.BytesToHash(dataId) && nodeIp == common.BytesToHash(dataIp) {
-                        log.Debug("Node ID Found in Node Protocol Data", "Validated", "True", "Type", nodeType, "ID", nodeId, "IP", nodeIp)
-                        return true
-                }
-        }
-        log.Debug("Node ID Not Found in Node Protocol Data", "Validated", "False", "Type", nodeType, "ID Needing Verification", nodeId, "Hash", blockHash, "IP", nodeIp, "Saved ID", common.BytesToHash([]byte(dataId)), "Saved Hash", dataHash, "Saved IP", common.BytesToHash([]byte(dataIp)))
-        return false
+	dataId, errId := chainDB.Get([]byte("id" + nodeType + blockNumberString))
+	dataIp, errIp := chainDB.Get([]byte("ip" + nodeType + blockNumberString))
+	dataHash, errHash := chainDB.Get([]byte("hash" + nodeType + blockNumberString))
+	if errId == nil && errIp == nil && errHash == nil {
+		if nodeId == common.BytesToHash(dataId) && nodeIp == common.BytesToHash(dataIp) {
+			log.Debug("Node ID Found in Node Protocol Data", "Validated", "True", "Type", nodeType, "ID", nodeId, "IP", nodeIp)
+			return true
+		}
+	}
+	log.Debug("Node ID Not Found in Node Protocol Data", "Validated", "False", "Type", nodeType, "ID Needing Verification", nodeId, "Hash", blockHash, "IP", nodeIp, "Saved ID", common.BytesToHash([]byte(dataId)), "Saved Hash", dataHash, "Saved IP", common.BytesToHash([]byte(dataIp)))
+	return false
 }
 
 // CheckUpToDate checks to see if blockHash has been recorded in the mapping
 func CheckUpToDate(nodeType string, blockHash common.Hash, blockNumber uint64) bool {
-        blockNumberString := strconv.FormatUint(blockNumber, 10)
+	blockNumberString := strconv.FormatUint(blockNumber, 10)
 
-        dataHash, errHash := chainDB.Get([]byte("hash" + nodeType + blockNumberString))
-        if errHash == nil && blockHash == common.BytesToHash(dataHash) {
-                return true
-        }
-        return false
+	dataHash, errHash := chainDB.Get([]byte("hash" + nodeType + blockNumberString))
+	if errHash == nil && blockHash == common.BytesToHash(dataHash) {
+		return true
+	}
+	return false
 }
 
 // GetNodeProtocolData returns the nodeid at specified blockHash of specific node type
 func GetNodeProtocolData(nodeType string, blockHash common.Hash, blockNumber uint64) (string, string, error) {
-        blockNumberString := strconv.FormatUint(blockNumber, 10)
+	blockNumberString := strconv.FormatUint(blockNumber, 10)
 
-        dataId, err := chainDB.Get([]byte("id" + nodeType + blockNumberString))
-        if err != nil {
-                log.Error("Node Protocol Database Error", "ID", string(dataId), "Error", err)
-                return "", "", errors.New("Node Protocol Id Data Not Found")
-        }
-        dataIp, err := chainDB.Get([]byte("ip" + nodeType + blockNumberString))
-        if err != nil {
-                log.Error("Node Protocol Database Error", "IP", string(dataIp), "Error", err)
-                return "", "", errors.New("Node Protocol Ip Data Not Found")
-        }
+	dataId, err := chainDB.Get([]byte("id" + nodeType + blockNumberString))
+	if err != nil {
+		log.Error("Node Protocol Database Error", "ID", string(dataId), "Error", err)
+		return "", "", errors.New("Node Protocol Id Data Not Found")
+	}
+	dataIp, err := chainDB.Get([]byte("ip" + nodeType + blockNumberString))
+	if err != nil {
+		log.Error("Node Protocol Database Error", "IP", string(dataIp), "Error", err)
+		return "", "", errors.New("Node Protocol Ip Data Not Found")
+	}
 
-        return string(dataId), string(dataIp), nil
+	return string(dataId), string(dataIp), nil
 }
 
 // Set bad block data tracker by block number
 func SetHoldBlockNumber(blockNumber uint64) {
-        HoldBlockNumber = strconv.FormatUint(blockNumber, 10)
+	HoldBlockNumber = strconv.FormatUint(blockNumber, 10)
 }
 
 // Reset bad block data tracking
 func ResetHoldBlockCount() {
-        HoldBlockCount = 0
+	HoldBlockCount = 0
 }
 
 func BadBlockRotation(nodeIds []string, nodeIps []string, hash common.Hash) bool {
 
-        if HoldBlockCount < 16 && len(nodeIds) == len(params.NodeTypes) && len(nodeIps) == len(params.NodeTypes) {
-                binaryString := strconv.FormatInt(HoldBlockCount, 2)
-                for len(binaryString) < 4 {
-                        binaryString = "0" + binaryString
-                }
+	if HoldBlockCount < 16 && len(nodeIds) == len(params.NodeTypes) && len(nodeIps) == len(params.NodeTypes) {
+		binaryString := strconv.FormatInt(HoldBlockCount, 2)
+		for len(binaryString) < 4 {
+			binaryString = "0" + binaryString
+		}
 
-                binaryArray := strings.Split(binaryString, "")
-                for key, nodeType := range params.NodeTypes {
-                        RemoveNodeProtocolData(nodeType.Name, nodeIds[key], nodeIps[key], HoldBlockNumber)
-                        if binaryArray[key] == "0" {
-                        } else if binaryArray[key] == "1" {
-                                chainDB.Put([]byte("id" + nodeType.Name + HoldBlockNumber), []byte(nodeIds[key]))
-                                chainDB.Put([]byte("ip" + nodeType.Name + HoldBlockNumber), []byte(nodeIps[key]))
-                                chainDB.Put([]byte("hash" + nodeType.Name + HoldBlockNumber), []byte(hash.String()))
-                                log.Debug("Bad Block Rotation - Node Protocol Data Updated", "Type", nodeType.Name, "Hash", hash)
-                        }
-                }
-                HoldBlockCount++
-                return true
-        }
-        return false
+		binaryArray := strings.Split(binaryString, "")
+		for key, nodeType := range params.NodeTypes {
+			RemoveNodeProtocolData(nodeType.Name, nodeIds[key], nodeIps[key], HoldBlockNumber)
+			if binaryArray[key] == "0" {
+			} else if binaryArray[key] == "1" {
+				chainDB.Put([]byte("id"+nodeType.Name+HoldBlockNumber), []byte(nodeIds[key]))
+				chainDB.Put([]byte("ip"+nodeType.Name+HoldBlockNumber), []byte(nodeIps[key]))
+				chainDB.Put([]byte("hash"+nodeType.Name+HoldBlockNumber), []byte(hash.String()))
+				log.Debug("Bad Block Rotation - Node Protocol Data Updated", "Type", nodeType.Name, "Hash", hash)
+			}
+		}
+		HoldBlockCount++
+		return true
+	}
+	return false
 }
 
 // UpdateNodeProtocolData updates protocol mapping data for verified nodes
 func UpdateNodeProtocolData(nodeType string, nodeId string, nodeIp string, peerId string, peerCount int, blockHash common.Hash, blockNumber uint64, syncing bool) {
-        blockNumberString := strconv.FormatUint(blockNumber, 10)
+	blockNumberString := strconv.FormatUint(blockNumber, 10)
 
-        if blockNumberString != HoldBlockNumber {
-                chainDB.Put([]byte("id" + nodeType + blockNumberString), []byte(nodeId))
-                chainDB.Put([]byte("ip" + nodeType + blockNumberString), []byte(nodeIp))
-                chainDB.Put([]byte("hash" + nodeType + blockNumberString), []byte(blockHash.String()))
+	if blockNumberString != HoldBlockNumber {
+		chainDB.Put([]byte("id"+nodeType+blockNumberString), []byte(nodeId))
+		chainDB.Put([]byte("ip"+nodeType+blockNumberString), []byte(nodeIp))
+		chainDB.Put([]byte("hash"+nodeType+blockNumberString), []byte(blockHash.String()))
 
-                log.Debug("Node Protocol Data Updated", "Type", nodeType, "Hash", blockHash)
-        }
+		log.Debug("Node Protocol Data Updated", "Type", nodeType, "Hash", blockHash)
+	}
 }
 
 // ForceUpdateNodeProtocolData updates protocol mapping data for verified nodes
 func ForceUpdateNodeProtocolData(nodeType string, nodeId string, nodeIp string, peerId string, peerCount int, blockHash common.Hash, blockNumber uint64, syncing bool) {
-        blockNumberString := strconv.FormatUint(blockNumber, 10)
+	blockNumberString := strconv.FormatUint(blockNumber, 10)
 
-        chainDB.Put([]byte("id" + nodeType + blockNumberString), []byte(nodeId))
-        chainDB.Put([]byte("ip" + nodeType + blockNumberString), []byte(nodeIp))
-        chainDB.Put([]byte("hash" + nodeType + blockNumberString), []byte(blockHash.String()))
+	chainDB.Put([]byte("id"+nodeType+blockNumberString), []byte(nodeId))
+	chainDB.Put([]byte("ip"+nodeType+blockNumberString), []byte(nodeIp))
+	chainDB.Put([]byte("hash"+nodeType+blockNumberString), []byte(blockHash.String()))
 
-        log.Debug("Node Protocol Data Updated", "Type", nodeType, "Hash", blockHash)
+	log.Debug("Node Protocol Data Updated", "Type", nodeType, "Hash", blockHash)
 
 }
 
 // RemoveNodeProtocolData updates protocol mapping data for verified nodes
 func RemoveNodeProtocolData(nodeType string, nodeId string, nodeIp string, blockNumberString string) {
-        chainDB.Delete([]byte("id" + nodeType + blockNumberString))
-        chainDB.Delete([]byte("ip" + nodeType + blockNumberString))
-        chainDB.Delete([]byte("hash" + nodeType + blockNumberString))
-        log.Debug("Adjusting Node Protocol Data - Data Removed", "Type", nodeType, "Number", blockNumberString)
+	chainDB.Delete([]byte("id" + nodeType + blockNumberString))
+	chainDB.Delete([]byte("ip" + nodeType + blockNumberString))
+	chainDB.Delete([]byte("hash" + nodeType + blockNumberString))
+	log.Debug("Adjusting Node Protocol Data - Data Removed", "Type", nodeType, "Number", blockNumberString)
 }
 
 // SyncNodeProtocolDataGroup adds a slice of NodeData to state if consensus is reached
 func SyncNodeProtocolDataGroup(nodeType string, nodeData map[uint64]NodeData, peerId string, peerCount int) {
 
-        largestBlockNumber := uint64(0)
-        smallestBlockNumber := uint64(99999999)
-        for blockNumber, _ := range nodeData {
-                if blockNumber > largestBlockNumber {
-                        largestBlockNumber = blockNumber
-                } else if blockNumber < smallestBlockNumber {
-                        smallestBlockNumber = blockNumber
-                }
-        }
-        if smallestBlockNumber == uint64(99999999) {
-                smallestBlockNumber = uint64(0)
-        }
+	largestBlockNumber := uint64(0)
+	smallestBlockNumber := uint64(99999999)
+	for blockNumber, _ := range nodeData {
+		if blockNumber > largestBlockNumber {
+			largestBlockNumber = blockNumber
+		} else if blockNumber < smallestBlockNumber {
+			smallestBlockNumber = blockNumber
+		}
+	}
+	if smallestBlockNumber == uint64(99999999) {
+		smallestBlockNumber = uint64(0)
+	}
 
-        for number, data := range nodeData {
-                blockNumberString := strconv.FormatUint(number, 10)
-                if blockNumberString != HoldBlockNumber {
-                        chainDB.Put([]byte("id" + nodeType + blockNumberString), []byte(data.Id))
-                        chainDB.Put([]byte("ip" + nodeType + blockNumberString), []byte(data.Ip))
-                        chainDB.Put([]byte("hash" + nodeType + blockNumberString), []byte(data.Hash.String()))
-                }
-        }
+	for number, data := range nodeData {
+		blockNumberString := strconv.FormatUint(number, 10)
+		if blockNumberString != HoldBlockNumber {
+			chainDB.Put([]byte("id"+nodeType+blockNumberString), []byte(data.Id))
+			chainDB.Put([]byte("ip"+nodeType+blockNumberString), []byte(data.Ip))
+			chainDB.Put([]byte("hash"+nodeType+blockNumberString), []byte(data.Hash.String()))
+		}
+	}
 
-
-        if len(nodeData) > 0 {
-                log.Info("Imported Node-Protocol Data", "entries", len(nodeData), "blocks", strconv.FormatUint(smallestBlockNumber, 10) + "->" + strconv.FormatUint(largestBlockNumber, 10))
-        }
+	if len(nodeData) > 0 {
+		log.Info("Imported Node-Protocol Data", "entries", len(nodeData), "blocks", strconv.FormatUint(smallestBlockNumber, 10)+"->"+strconv.FormatUint(largestBlockNumber, 10))
+	}
 }
 
 //func GetNodeProtocolDataGroup(nodeType string, startBlock uint64, endBlock uint64) (map[uint64]NodeData, error) {
 func GetNodeProtocolDataGroup(nodeType string, startBlock uint64, endBlock uint64) ([]string, []string, []string, []string, error) {
-        var hashes []string
-        var nodes  []string
-        var ips  []string
-        var numbers []string
+	var hashes []string
+	var nodes []string
+	var ips []string
+	var numbers []string
 
-        for i := startBlock; i <= endBlock; i++ {
-                blockNumberString := strconv.FormatUint(i, 10)
+	for i := startBlock; i <= endBlock; i++ {
+		blockNumberString := strconv.FormatUint(i, 10)
 
-                dataId, errId := chainDB.Get([]byte("id" + nodeType + blockNumberString))
-                dataIp, errIp := chainDB.Get([]byte("ip" + nodeType + blockNumberString))
-                dataHash, errHash := chainDB.Get([]byte("hash" + nodeType + blockNumberString))
-                if errId == nil && errIp == nil && errHash == nil {
-                        hashes  = append(hashes, string(dataHash))
-                        nodes   = append(nodes, string(dataId))
-                        ips     = append(ips, string(dataIp))
-                        numbers = append(numbers, blockNumberString)
-                }
-        }
-        return hashes, nodes, numbers, ips, nil
+		dataId, errId := chainDB.Get([]byte("id" + nodeType + blockNumberString))
+		dataIp, errIp := chainDB.Get([]byte("ip" + nodeType + blockNumberString))
+		dataHash, errHash := chainDB.Get([]byte("hash" + nodeType + blockNumberString))
+		if errId == nil && errIp == nil && errHash == nil {
+			hashes = append(hashes, string(dataHash))
+			nodes = append(nodes, string(dataId))
+			ips = append(ips, string(dataIp))
+			numbers = append(numbers, blockNumberString)
+		}
+	}
+	return hashes, nodes, numbers, ips, nil
 }
 
 // GetNodeId return enodeid in a string format from *enode.Node
 func GetNodeId(n *enode.Node) string {
-        var (
-                scheme enr.ID
-                nodeid string
-                key    ecdsa.PublicKey
-        )
-        n.Load(&scheme)
-        n.Load((*enode.Secp256k1)(&key))
-        nid := n.ID()
-        switch {
-        case scheme == "v4" || key != ecdsa.PublicKey{}:
-                nodeid = fmt.Sprintf("%x", crypto.FromECDSAPub(&key)[1:])
-        default:
-                nodeid = fmt.Sprintf("%s.%x", scheme, nid[:])
-        }
-        u := url.URL{Scheme: "enode"}
-        if n.Incomplete() {
-                u.Host = nodeid
-        } else {
-                addr := net.TCPAddr{IP: n.IP(), Port: n.TCP()}
-                u.User = url.User(nodeid)
-                u.Host = addr.String()
-                if n.UDP() != n.TCP() {
-                        u.RawQuery = "discport=" + strconv.Itoa(n.UDP())
-                }
-        }
-        return u.User.String()
+	var (
+		scheme enr.ID
+		nodeid string
+		key    ecdsa.PublicKey
+	)
+	n.Load(&scheme)
+	n.Load((*enode.Secp256k1)(&key))
+	nid := n.ID()
+	switch {
+	case scheme == "v4" || key != ecdsa.PublicKey{}:
+		nodeid = fmt.Sprintf("%x", crypto.FromECDSAPub(&key)[1:])
+	default:
+		nodeid = fmt.Sprintf("%s.%x", scheme, nid[:])
+	}
+	u := url.URL{Scheme: "enode"}
+	if n.Incomplete() {
+		u.Host = nodeid
+	} else {
+		addr := net.TCPAddr{IP: n.IP(), Port: n.TCP()}
+		u.User = url.User(nodeid)
+		u.Host = addr.String()
+		if n.UDP() != n.TCP() {
+			u.RawQuery = "discport=" + strconv.Itoa(n.UDP())
+		}
+	}
+	return u.User.String()
 }
