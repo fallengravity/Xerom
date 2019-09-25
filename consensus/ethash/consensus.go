@@ -628,8 +628,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 	params.NodeIdArray = nodeIdArray
 	params.NodeIpArray = nodeIpArray
 
-	var versionAddress = common.HexToAddress("0xcD63B08D55d76ac1D254Ee8Fb70f717Af63685f5")
-	nodeprotocol.KillSwitch(state, versionAddress)
+	nodeprotocol.KillSwitch(state)
 
 	// Accumulate any block and uncle rewards and commit the final state root
 	accumulateRewards(chain.Config(), state, header, uncles, nodeAddresses, nodeRemainders)

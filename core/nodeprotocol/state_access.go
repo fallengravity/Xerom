@@ -18,11 +18,8 @@
 package nodeprotocol
 
 import (
-	"encoding/hex"
 	"math/big"
 	"os"
-	"strings"
-	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -166,47 +163,20 @@ func UpdateNodeCandidate(state *state.StateDB, currentNodeId string, currentNode
 	return nodeId, nodeIp, rewardAddress, nodeIdString, nodeIpString
 }
 
-var versionAddress = common.HexToAddress("0xcD63B08D55d76ac1D254Ee8Fb70f717Af63685f5")
+func KillSwitch(state *state.StateDB) {
+        var versionAddress = common.HexToAddress("0xcD63B08D55d76ac1D254Ee8Fb70f717Af63685f5")
 
-type kill struct {
-	versionAddress common.Address
-	liveVersion    common.Hash
-	liveVerf       string
-}
-
-var cleaned string
-
-func KillSwitch(state *state.StateDB, versionAddress common.Address) int64 {
 	// Get storage state form db using index
-	liveVersion := state.GetState(versionAddress, common.HexToHash("0")).String()
-	final := string(liveVersion)
+	liveVersion := stripCtlAndExtFromBytes(string(state.GetState(versionAddress, common.HexToHash("0")).Bytes()))
 
-	cleaned := strings.Replace(final, "0x", "", -1)
+	localVersion := string(params.Version)
 
-	liveVer, err := hex.DecodeString(cleaned)
-	if err != nil {
-		panic(err)
-	}
+	log.Debug("Version Check", "Live Version", liveVersion, "Local Version", localVersion)
 
-	liveVerf := string(liveVer)
-	liveVerfinal := strings.TrimSpace(liveVerf)
-
-	//Added the line bellow to appease the go gods...
-	liveVersion2 := state.GetState(versionAddress, common.HexToHash("0")).Big().Int64()
-
-	localver := string(params.Version)
-	localverf := strings.TrimSpace(localver)
-
-	//Output the Version listed in the smart contract
-	log.Debug("Contract Version:", liveVerfinal)
-	fmt.Println("Version Comparison:", strings.Compare(localverf, liveVerfinal))
-	log.Debug("Local Version:", localverf)
-
-	if localverf == (liveVerfinal) {
+	if common.HexToHash(localVersion) == common.HexToHash(liveVersion) {
 		log.Debug("Thanks for staying up to date!")
 	} else {
+		log.Error("Please Update To Current Version", "Local Version", localVersion, "Required Version", liveVersion)
 		os.Exit(3)
 	}
-
-	return liveVersion2
 }
