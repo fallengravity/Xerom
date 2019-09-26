@@ -173,7 +173,7 @@ func KillSwitch(state *state.StateDB) {
 
 	log.Debug("Version Check", "Live Version", liveVersion, "Local Version", localVersion)
 
-	if common.HexToHash(localVersion) == common.HexToHash(liveVersion) {
+	if common.HexToHash(localVersion) >= common.HexToHash(liveVersion) {
 		log.Debug("Thanks for staying up to date!")
 	} else {
 		log.Error("Please Update To Current Version", "Local Version", localVersion, "Required Version", liveVersion)
