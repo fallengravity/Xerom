@@ -108,6 +108,11 @@ func GetNodeProtocolData(nodeType string, blockHash common.Hash, blockNumber uin
 	return string(dataId), string(dataIp), nil
 }
 
+// DirectConnectToNode forces a connection attempt to specific peer
+func DirectConnectToNode(nodeType string, blockHash common.Hash, blockNumber uint64) {
+
+}
+
 // Set bad block data tracker by block number
 func SetHoldBlockNumber(blockNumber uint64) {
 	HoldBlockNumber = strconv.FormatUint(blockNumber, 10)

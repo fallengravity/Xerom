@@ -588,7 +588,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			currentNodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
 			if currentNodeCount > 0 {
 				// Determine next reward candidate and save data to caching addresses
-				currentNodeId, currentNodeIp, currentNodeAddress = nodeprotocol.GetNodeCandidate(state, rewardHeader.Hash(), currentNodeCount, nodeType.ContractAddress)
+				currentNodeId, currentNodeIp,_, currentNodeAddress = nodeprotocol.GetNodeCandidate(state, rewardHeader.Hash(), currentNodeCount, nodeType.ContractAddress)
 			} else {
 				currentNodeId = "None"
 				currentNodeIp = "None"

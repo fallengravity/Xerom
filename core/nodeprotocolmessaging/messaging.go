@@ -28,6 +28,7 @@ import (
 var pm Manager
 var peerSet PeerSet
 var bc Blockchain
+var privateAdminApi PrivateAdminAPI
 var SyncWg sync.WaitGroup
 var Syncing bool
 
@@ -51,6 +52,23 @@ type Blockchain interface {
 	GetBlockByNumber(number uint64) *types.Block
 	CurrentBlock() *types.Block
 	GetBlockByHash(hash common.Hash) *types.Block
+}
+
+type PrivateAdminAPI interface {
+	AddPeer(url string) (bool, error)
+}
+
+func SetPrivateAdminApi(api PrivateAdminAPI) {
+	privateAdminApi = api
+}
+
+func AddPeer(url string) {
+	privateAdminApi.AddPeer(url)
+}
+
+func DirectConnectToNode(id string, ip string, port string) {
+	enodeUrl := "enode://" + id + "@" + ip + ":" + port
+	AddPeer(enodeUrl)
 }
 
 func SetBlockchain(blockchain Blockchain) {
