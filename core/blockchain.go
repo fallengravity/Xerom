@@ -538,12 +538,14 @@ func (bc *BlockChain) insert(block *types.Block) {
                                                 if previousRewardBlock != nil && !nodeprotocol.CheckUpToDate(nodeType.Name, previousRewardBlock.Hash(), previousRewardBlock.NumberU64()) {
                                                         log.Debug("Requesting Previous Reward Block Candidate Data", "Type", nodeType.Name)
                                                         previousRewardBlockNumber := strconv.FormatUint(previousRewardBlock.NumberU64(), 10)
-							previousState,_ := nodeprotocolmessaging.GetStateAt(previousRewardBlock.Hash())
-                                        		previousNodeCount := nodeprotocol.GetNodeCount(previousState, nodeType.ContractAddress)
-                                      	 	        previousNodeId, previousNodeIp, previousNodePort, _ := nodeprotocol.GetNodeCandidate(previousState, previousRewardBlock.Hash(), previousNodeCount, nodeType.ContractAddress)
-							nodeprotocolmessaging.DirectConnectToNode(previousNodeId, previousNodeIp, previousNodePort)
-                                                        var data = []string{nodeType.Name, previousRewardBlock.Hash().String(), previousRewardBlockNumber}
-                                                        nodeprotocolmessaging.RequestNodeProtocolData(data)
+							previousState, stateErr := nodeprotocolmessaging.GetStateAt(previousRewardBlock.Hash())
+							if stateErr == nil {
+        	                                		previousNodeCount := nodeprotocol.GetNodeCount(previousState, nodeType.ContractAddress)
+                	                      	 	        previousNodeId, previousNodeIp, previousNodePort, _ := nodeprotocol.GetNodeCandidate(previousState, previousRewardBlock.Hash(), previousNodeCount, nodeType.ContractAddress)
+								nodeprotocolmessaging.DirectConnectToNode(previousNodeId, previousNodeIp, previousNodePort)
+							}
+                                	                var data = []string{nodeType.Name, previousRewardBlock.Hash().String(), previousRewardBlockNumber}
+                                        	        nodeprotocolmessaging.RequestNodeProtocolData(data)
                                                 }
                                                 previousParentRewardBlock := bc.GetBlockByHash(previousRewardBlock.ParentHash())
                                                 if previousParentRewardBlock != nil && !nodeprotocol.CheckUpToDate(nodeType.Name, previousParentRewardBlock.Hash(), previousParentRewardBlock.NumberU64()) {
