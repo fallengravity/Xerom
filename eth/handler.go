@@ -216,6 +216,12 @@ func (pm *ProtocolManager) removePeer(id string) {
 	if peer != nil {
 		peer.Peer.Disconnect(p2p.DiscUselessPeer)
 	}
+
+	// When peer count drops below min, rollback and resync
+	if pm.peers.Len() < minRequiredPeerCount {
+		nodeprotocolmessaging.RollBackChain(50)
+		pm.synchronise(pm.peers.BestPeer())
+	}
 }
 
 func (pm *ProtocolManager) Start(maxPeers int) {
