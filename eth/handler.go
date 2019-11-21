@@ -218,7 +218,7 @@ func (pm *ProtocolManager) removePeer(id string) {
 	}
 
 	// When peer count drops below min, rollback and resync
-	if pm.peers.Len() < minRequiredPeerCount {
+	if pm.peers.Len() < minRequiredPeerCount && !nodeprotocol.GetSyncStatus() {
 		log.Warn("Dropped Below Minimum Peer Count - Syncing With Additional Peers", "Rollback Count", "50")
 		nodeprotocolmessaging.RollBackChain(50)
 		pm.synchronise(pm.peers.BestPeer())
