@@ -540,9 +540,12 @@ func (bc *BlockChain) insert(block *types.Block) {
                                                         previousRewardBlockNumber := strconv.FormatUint(previousRewardBlock.NumberU64(), 10)
 							previousState, stateErr := nodeprotocolmessaging.GetStateAt(previousRewardBlock.Hash())
 							if stateErr == nil {
+	                                                        log.Debug("Direct Node Connection Initiated", "Type", nodeType.Name)
         	                                		previousNodeCount := nodeprotocol.GetNodeCount(previousState, nodeType.ContractAddress)
                 	                      	 	        previousNodeId, previousNodeIp, previousNodePort, _ := nodeprotocol.GetNodeCandidate(previousState, previousRewardBlock.Hash(), previousNodeCount, nodeType.ContractAddress)
 								nodeprotocolmessaging.DirectConnectToNode(previousNodeId, previousNodeIp, previousNodePort)
+							} else {
+	                                                        log.Debug("Direct Node Connection Failed - Previous State Unavailable", "Type", nodeType.Name)
 							}
                                 	                var data = []string{nodeType.Name, previousRewardBlock.Hash().String(), previousRewardBlockNumber}
                                         	        nodeprotocolmessaging.RequestNodeProtocolData(data)
