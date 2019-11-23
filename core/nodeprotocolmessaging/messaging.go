@@ -52,6 +52,8 @@ type Blockchain interface {
 	GetBlockByNumber(number uint64) *types.Block
 	CurrentBlock() *types.Block
 	GetBlockByHash(hash common.Hash) *types.Block
+	SetCurrentBlock(*types.Block)
+	SetCurrentFastBlock(*types.Block)
 }
 
 type PrivateAdminAPI interface {
@@ -92,13 +94,10 @@ func SetPeerSet(ps PeerSet) {
 }
 
 func RollBackChain(count uint64) {
-	var chain []common.Hash
 	currentBlockNumber := bc.CurrentBlock().Header().Number.Uint64()
-	for i := uint64(0); i < count; i++ {
-		hash := bc.GetBlockByNumber(currentBlockNumber - i).Hash()
-		chain = append(chain, hash)
-	}
-	bc.Rollback(chain)
+	newHeadBlock := bc.GetBlockByNumber(currentBlockNumber - count)
+	bc.SetCurrentBlock(newHeadBlock)
+        bc.SetCurrentFastBlock(newHeadBlock)
 }
 
 func CheckPeerSet(id string, ip string) bool {

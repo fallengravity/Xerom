@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/nodeprotocol"
+	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -621,8 +622,13 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			nodeRemainders = append(nodeRemainders, nodeRemainder)
 		}
 
-		//Checking for active node
-		nodeprotocol.CheckActiveNode(totalNodeCount, header.Hash(), header.Number.Int64())
+		if !nodeprotocolmessaging.GetSyncStatus() {
+			//Checking for active node
+			nodeprotocol.CheckActiveNode(totalNodeCount, header.Hash(), header.Number.Int64())
+		} else {
+			//Checking for active node during sync
+			nodeprotocol.CheckActiveNodeSync(totalNodeCount, header.Hash(), header.Number.Int64())
+		}
 
 	}
 	params.NodeIdArray = nodeIdArray

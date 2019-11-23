@@ -33,7 +33,14 @@ func SetProtocolFlag(active bool) {
 
 func CheckActiveNode(totalNodeCount uint64, hash common.Hash, blockNumber int64) {
 	if NodeFlag {
-		log.Info("Node Protocol is Active", "active", "true")
+		log.Info("Node Protocol is Active", "status", "active")
+		log.Info("Validating Node-Protocol Reward Candidates", "number", blockNumber, "hash", hash, "registered nodes", totalNodeCount)
+	}
+}
+
+func CheckActiveNodeSync(totalNodeCount uint64, hash common.Hash, blockNumber int64) {
+	if NodeFlag && (blockNumber % 250 == 0) {
+		log.Info("Node Protocol is Active", "status", "syncing")
 		log.Info("Validating Node-Protocol Reward Candidates", "number", blockNumber, "hash", hash, "registered nodes", totalNodeCount)
 	}
 }

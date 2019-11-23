@@ -218,7 +218,7 @@ func (pm *ProtocolManager) removePeer(id string) {
 	}
 
 	// When peer count drops below min, rollback and resync
-	if pm.peers.Len() < minRequiredPeerCount && !nodeprotocol.GetSyncStatus() {
+	if pm.peers.Len() < minRequiredPeerCount && !nodeprotocolmessaging.GetSyncStatus() {
 		log.Warn("Dropped Below Minimum Peer Count - Syncing With Additional Peers", "Rollback Count", "50")
 		nodeprotocolmessaging.RollBackChain(50)
 		pm.synchronise(pm.peers.BestPeer())
@@ -286,6 +286,13 @@ func (pm *ProtocolManager) Stop() {
 
 func (pm *ProtocolManager) SyncStatus() bool {
         return pm.downloader.Synchronising()
+	/*progress := pm.downloader.Progress()
+
+        // Return not syncing if the synchronisation already completed
+        if progress.CurrentBlock >= progress.HighestBlock {
+                return false
+        }
+	return true*/
 }
 
 func (pm *ProtocolManager) newPeer(pv int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {

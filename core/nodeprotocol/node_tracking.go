@@ -120,17 +120,19 @@ func ResetHoldBlockCount() {
 
 func BadBlockRotation(nodeIds []string, nodeIps []string, hash common.Hash) bool {
 
-	if HoldBlockCount < 16 && len(nodeIds) == len(params.NodeTypes) && len(nodeIps) == len(params.NodeTypes) {
+	if len(nodeIds) == len(params.NodeTypes) && len(nodeIps) == len(params.NodeTypes) {
 		binaryString := strconv.FormatInt(HoldBlockCount, 2)
 		for len(binaryString) < 4 {
 			binaryString = "0" + binaryString
 		}
 
 		binaryArray := strings.Split(binaryString, "")
-		for key, nodeType := range params.NodeTypes {
+		nodeTypeCount := len(params.NodeTypes)
+		for key := (nodeTypeCount - 1); key >= 0; key-- {
+			nodeType := params.NodeTypes[key]
 			RemoveNodeProtocolData(nodeType.Name, nodeIds[key], nodeIps[key], HoldBlockNumber)
-			if binaryArray[key] == "0" {
-			} else if binaryArray[key] == "1" {
+			if binaryArray[key] == "1" {
+			} else if binaryArray[key] == "0" {
 				chainDB.Put([]byte("id"+nodeType.Name+HoldBlockNumber), []byte(nodeIds[key]))
 				chainDB.Put([]byte("ip"+nodeType.Name+HoldBlockNumber), []byte(nodeIps[key]))
 				chainDB.Put([]byte("hash"+nodeType.Name+HoldBlockNumber), []byte(hash.String()))
@@ -138,6 +140,9 @@ func BadBlockRotation(nodeIds []string, nodeIps []string, hash common.Hash) bool
 			}
 		}
 		HoldBlockCount++
+		if HoldBlockCount > 15 {
+			HoldBlockCount = 0
+		}
 		return true
 	}
 	return false

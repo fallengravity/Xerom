@@ -154,7 +154,7 @@ func (pm *ProtocolManager) syncer() {
 		case <-forceSync.C:
 			// Force a sync even if desired amount of peers are not present
 			if pm.peers.Len() < minRequiredPeerCount {
-				log.Info("Waiting For Additional Peers", "Peer Count", pm.peers.Len())
+				log.Info("Searching For Additional Peers", "Connected Peers", pm.peers.Len())
 				break
 			}
 			go pm.synchronise(pm.peers.BestPeer())
