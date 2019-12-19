@@ -597,23 +597,24 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			}
 
 			nodeCount := nodeprotocol.UpdateNodeCount(state, currentNodeCount, nodeType.CountCachingAddresses)
-			nodeId, nodeIp, nodeAddress, nodeIdString, nodeIpString := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
+			_, _, nodeAddress, nodeIdString, nodeIpString := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
+			//nodeId, nodeIp, nodeAddress, nodeIdString, nodeIpString := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
 
 			nodeIdArray = append(nodeIdArray, nodeIdString)
 			nodeIpArray = append(nodeIpArray, nodeIpString)
 
 			if nodeCount > 0 {
 				totalNodeCount += nodeCount
-				if nodeprotocol.CheckNodeStatus(nodeType.Name, nodeId, nodeIp, payoutHeader.Hash(), payoutHeader.Number.Uint64()) {
-					log.Debug("Node Status Verified", "Node Type", nodeType.Name, "ID", nodeId, "IP", nodeIp)
+				if nodeprotocol.CheckNodeStatus(nodeType.Name, payoutHeader.Number.Uint64()) {
+					log.Debug("Node Status Verified", "Node Type", nodeType.Name, "Number", payoutHeader.Number.Uint64())
 					nodeAddresses = append(nodeAddresses, nodeAddress)
 				} else {
-					log.Debug("Node Status Not Verified - Deferring To Remainder Address", "Node Type", nodeType.Name, "ID", nodeId, "IP", nodeIp)
+					log.Debug("Node Status Not Verified - Deferring To Remainder Address", "Node Type", nodeType.Name, "Number", payoutHeader.Number.Uint64())
 					nodeAddresses = append(nodeAddresses, nodeType.RemainderAddress)
 				}
 			} else {
 				// Send reward to remainder address if zero nodes exist
-				log.Debug("No Active Nodes Found - Deferring to Remainder Address", "Node Type", nodeType.Name, "ID", nodeId, "IP", nodeIp)
+				log.Debug("No Active Nodes Found - Deferring to Remainder Address", "Node Type", nodeType.Name, "Number", payoutHeader.Number.Uint64())
 				nodeAddresses = append(nodeAddresses, nodeType.RemainderAddress)
 			}
 

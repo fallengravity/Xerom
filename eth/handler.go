@@ -388,51 +388,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	// Handle the message depending on its contents
 	switch {
 
-        case msg.Code == GetNodeProtocolPeerVerificationMsg:
-                var nodeProtocolData []string
-                if err := msg.Decode(&nodeProtocolData); err != nil {
-                        return errResp(ErrDecode, "msg %v: %v", msg, err)
-                }
-                if len(nodeProtocolData) == 5 {
-                        if pm.peers.CheckPeerWithoutNodeDataMessage(nodeProtocolData[3] + nodeProtocolData[0], p) {
-                                p.MarkNodeDataMessage(nodeProtocolData[3] + nodeProtocolData[0])
-                                log.Trace("Receieved Peer Verification Message", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[1], "Number", nodeProtocolData[2], "ID", nodeProtocolData[3], "IP", nodeProtocolData[4])
-                                for _, peer := range pm.peers.peers {
-                                        id := nodeprotocol.GetNodeId(peer.Node())
-                                        ip := peer.Node().IP().String()
-                                        if id == nodeProtocolData[3] && ip == nodeProtocolData[4] {
-                                                data := []string{nodeProtocolData[0], nodeProtocolData[1], nodeProtocolData[2], nodeProtocolData[3], nodeProtocolData[4], "true"}
-                                                p.SendNodeProtocolPeerVerification(data)
-                                                p.MarkSendNodePeerVerification(nodeProtocolData[0] + nodeProtocolData[2])
-                                                return nil
-                                        } else if id == nodeProtocolData[3] && ip != nodeProtocolData[4] {
-                                                log.Error("Node Protocol Peer Verification IP Address Mismatch - Fraudulent Node Assumed", "ID", nodeProtocolData[3])
-                                                return nil
-                                        }
-                                }
-                                blockNumber,_ := strconv.ParseUint(nodeProtocolData[2], 10, 64)
-                                if nodeprotocol.CheckUpToDate(nodeProtocolData[0], common.HexToHash(nodeProtocolData[1]), blockNumber) {
-                                        nodeId, nodeIp, err := nodeprotocol.GetNodeProtocolData(nodeProtocolData[0], common.HexToHash(nodeProtocolData[1]), blockNumber)
-                                        if err == nil {
-                                                if nodeId == nodeProtocolData[3] && nodeIp == nodeProtocolData[4] {
-                                                        data := []string{nodeProtocolData[0], nodeProtocolData[1], nodeProtocolData[2], nodeProtocolData[3], nodeProtocolData[4], "true"}
-                                                        p.SendNodeProtocolPeerVerification(data)
-                                                        p.MarkSendNodePeerVerification(nodeProtocolData[0] + nodeProtocolData[2])
-                                                        return nil
-                                                } else if nodeId == nodeProtocolData[3] && nodeIp != nodeProtocolData[4] {
-                                                        log.Error("Node Protocol Peer Verification IP Address Mismatch - Fraudulent Node Assumed", "ID", nodeProtocolData[3])
-                                                        return nil
-                                                }
-                                        }
-                                }
-                                // If peer was not in peerset & not in database request verification & was not a fraudelent attempt, request data
-                                pm.AsyncGetNodeProtocolPeerVerification(nodeProtocolData)
-                        }
-                } else {
-                       log.Error("Incorrectly Formatted GetNodeProtocolPeerVerificationMsg")
-                }
-                return nil
-
 	case msg.Code == SendNodeProtocolPeerVerificationMsg:
                 var nodeProtocolData []string
                 if err := msg.Decode(&nodeProtocolData); err != nil {
@@ -442,90 +397,15 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         log.Trace("Sending Peer Verification Message", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[1], "Number", nodeProtocolData[2], "ID", nodeProtocolData[3] , "IP", nodeProtocolData[4])
                         peerId := nodeprotocol.GetNodeId(p.Node())
                         blockNumber,_ := strconv.ParseUint(nodeProtocolData[2], 10, 64)
-                        nodeprotocol.UpdateNodeProtocolData(nodeProtocolData[0], nodeProtocolData[3], nodeProtocolData[4], peerId, len(pm.peers.peers), common.HexToHash(nodeProtocolData[1]), blockNumber, false)
-                        pm.AsyncSendNodeProtocolPeerVerification(nodeProtocolData)
+                        nodeprotocol.UpdateNodeProtocolData("true", nodeProtocolData[0], blockNumber)
+			var nodeValidationData []string
+			nodeValidationData[0] = nodeProtocolData[0]
+			nodeValidationData[1] = nodeProtocolData[2]
+			nodeValidationData[2] = nodeProtocolData[5]
+			// [0] = node type, [1] - block number, [2] - validation message
+                        pm.AsyncSendNodeProtocolValidation(nodeValidationData)
                 } else {
                         log.Error("Incorrectly Formatted SendNodeProtocolPeerVerificationMsg")
-                }
-                return nil
-
-	case msg.Code == GetNodeProtocolSyncDataMsg:
-                var nodeProtocolData []string
-                if err := msg.Decode(&nodeProtocolData); err != nil {
-                        return errResp(ErrDecode, "msg %v: %v", msg, err)
-                }
-                if len(nodeProtocolData) == 3 {
-                        /*nodeType := nodeProtocolData[0]
-                        startingBlockNumber,_ := strconv.ParseUint(nodeProtocolData[1], 10, 64)
-                        blockCount,_ := strconv.ParseUint(nodeProtocolData[2], 10, 64)
-                        hashData, nodeData, blockData, ipData, _ := nodeprotocol.GetNodeProtocolDataGroup(nodeType, startingBlockNumber, (startingBlockNumber + blockCount))
-
-                        nodeDataLength  := len(nodeData)
-                        hashDataLength  := len(hashData)
-                        blockDataLength := len(blockData)
-                        ipDataLength    := len(ipData)
-
-                        if nodeDataLength == hashDataLength && hashDataLength == blockDataLength && blockDataLength == ipDataLength {
-                                var data = [][]string{[]string{nodeType}, nodeData, hashData, blockData, ipData}
-                                p.SendNodeProtocolSyncData(data)
-                        }*/
-                }
-                return nil
-
-	case msg.Code == SendNodeProtocolSyncDataMsg:
-                var nodeProtocolData [][]string
-                if err := msg.Decode(&nodeProtocolData); err != nil {
-                        return errResp(ErrDecode, "msg %v: %v", msg, err)
-                }
-                if len(nodeProtocolData) != 5 {
-                        log.Error("Incorrectly Formatted Node Data Sync Message Received")
-                } else {
-                        // Gather data from messaging
-                        nodeTypeData := nodeProtocolData[0]
-                        nodeData     := nodeProtocolData[1]
-                        hashData     := nodeProtocolData[2]
-                        blockData    := nodeProtocolData[3]
-                        ipData       := nodeProtocolData[4]
-
-                        nodeTypeDataLength := len(nodeTypeData)
-                        nodeDataLength     := len(nodeData)
-                        hashDataLength     := len(hashData)
-                        blockDataLength    := len(blockData)
-                        ipDataLength       := len(ipData)
-
-                        // Various data quality control checks
-                        if nodeTypeDataLength == 1 && nodeDataLength == hashDataLength && hashDataLength == blockDataLength && blockDataLength == ipDataLength {
-                                nodeDataMap := make(map[uint64]nodeprotocol.NodeData)
-                                for i := 0; i < nodeDataLength; i++ {
-                                        blockNumber,_ := strconv.ParseUint(blockData[i], 10, 64)
-                                        data := nodeprotocol.NodeData{Hash: common.HexToHash(hashData[i]), Id: nodeData[i], Ip: ipData[i]}
-                                        nodeDataMap[blockNumber] = data
-                                }
-                                nodeprotocol.SyncNodeProtocolDataGroup(nodeTypeData[0], nodeDataMap, nodeprotocol.GetNodeId(p.Node()), len(pm.peers.peers))
-                        }
-                }
-                return nil
-
-	case msg.Code == GetNodeProtocolDataMsg:
-
-                var nodeProtocolData []string
-		if err := msg.Decode(&nodeProtocolData); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-                if len(nodeProtocolData) == 3 {
-                        log.Trace("Receieved Node Protocol Data Request Message", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[1], "Number", nodeProtocolData[2])
-                        // Check if we have updated node protocol data
-                        blockNumber,_ := strconv.ParseUint(nodeProtocolData[2], 10, 64)
-                        if nodeprotocol.CheckUpToDate(nodeProtocolData[0], common.HexToHash(nodeProtocolData[1]), blockNumber) {
-                                nodeId, nodeIp, err := nodeprotocol.GetNodeProtocolData(nodeProtocolData[0], common.HexToHash(nodeProtocolData[1]), blockNumber)
-                                if err == nil {
-                                        var data = []string{nodeProtocolData[0], nodeId, nodeIp, nodeProtocolData[1], nodeProtocolData[2]}
-                                        p.SendNodeProtocolData(data)
-                                        p.MarkNodeData(nodeProtocolData[0] + nodeProtocolData[2])
-                                }
-                        }
-                } else {
-                        log.Error("Incorrectly Formatted Node Protocol Data Request")
                 }
                 return nil
 
@@ -544,12 +424,67 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         log.Trace("Receieved Node Protocol Data Message", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[3], "Number", nodeProtocolData[4], "ID", nodeProtocolData[1], "IP", nodeProtocolData[2])
 	                // Check if we have updated node protocol data
                         blockNumber,_ := strconv.ParseUint(nodeProtocolData[4], 10, 64)
-          	        if !nodeprotocol.CheckUpToDate(nodeProtocolData[0], common.HexToHash(nodeProtocolData[3]), blockNumber) {
+          	        if !nodeprotocol.CheckUpToDate(nodeProtocolData[0], blockNumber) {
                                 // Relay data to peerset
-                                pm.AsyncSendNodeProtocolData(nodeProtocolData)
+				var nodeValidationData []string
+				nodeValidationData[0] = nodeProtocolData[0]
+				nodeValidationData[1] = nodeProtocolData[4]
+				nodeValidationData[2] = "true"
+				// [0] = node type, [1] - block number, [2] - validation message
+                                pm.AsyncSendNodeProtocolValidation(nodeValidationData)
                         }
                         peerId := nodeprotocol.GetNodeId(p.Peer.Node())
-                        nodeprotocol.UpdateNodeProtocolData(nodeProtocolData[0], nodeProtocolData[1], nodeProtocolData[2], peerId, len(pm.peers.peers), common.HexToHash(nodeProtocolData[3]), blockNumber, false)
+                        nodeprotocol.UpdateNodeProtocolData("true", nodeProtocolData[0], blockNumber)
+                }
+                return nil
+
+	case msg.Code == GetNodeProtocolValidationMsg:
+
+                var nodeProtocolData []string
+		if err := msg.Decode(&nodeProtocolData); err != nil {
+			return errResp(ErrDecode, "msg %v: %v", msg, err)
+		}
+
+                if len(nodeProtocolData) != 2 {
+                        log.Error("Incorrectly Formatted Node Protocol Validation Message Received")
+                } else if pm.peers.CheckPeerWithoutNodeValidationMessage(nodeProtocolData[1] + nodeProtocolData[0], p) {
+
+                        p.MarkNodeValidationMessage(nodeProtocolData[1] + nodeProtocolData[0])
+
+                        log.Trace("Node Protocol Validation Request Received", "Type", nodeProtocolData[0], "Number", nodeProtocolData[1])
+                        blockNumber,_ := strconv.ParseUint(nodeProtocolData[1], 10, 64)
+			if nodeprotocol.CheckUpToDate(nodeProtocolData[0], blockNumber) {
+
+				nodeValidation, err := nodeprotocol.GetNodeProtocolData(nodeProtocolData[0], blockNumber)
+				if err == nil {
+					data := []string{nodeProtocolData[0], nodeProtocolData[1], nodeValidation}
+					p.SendNodeProtocolValidation(data)
+					p.MarkSendNodeValidationMessage(nodeProtocolData[1] + nodeProtocolData[0])
+				}
+			}
+		return nil
+
+	case msg.Code == SendNodeProtocolValidationMsg:
+
+                var nodeProtocolData []string
+		if err := msg.Decode(&nodeProtocolData); err != nil {
+			return errResp(ErrDecode, "msg %v: %v", msg, err)
+		}
+
+                if len(nodeProtocolData) != 3 {
+                        log.Error("Incorrectly Formatted Node Protocol Validation Message Received")
+                } else if pm.peers.CheckPeerWithoutNodeValidationMessage(nodeProtocolData[1] + nodeProtocolData[0], p) {
+                        p.MarkNodeValidationMessage(nodeProtocolData[1] + nodeProtocolData[0])
+
+                        log.Trace("Receieved Node Protocol Validation Message", "Type", nodeProtocolData[0], "Number", nodeProtocolData[1])
+	                // Check if we have updated node protocol data
+                        blockNumber,_ := strconv.ParseUint(nodeProtocolData[1], 10, 64)
+          	        if !nodeprotocol.CheckUpToDate(nodeProtocolData[0], blockNumber) {
+				// [0] = node type, [1] - block number, [2] - validation message
+                                pm.AsyncSendNodeProtocolValidation(nodeProtocolData)
+                        }
+                        peerId := nodeprotocol.GetNodeId(p.Peer.Node())
+                        nodeprotocol.UpdateNodeProtocolData(nodeProtocolData[1], nodeProtocolData[0], blockNumber)
                 }
                 return nil
 

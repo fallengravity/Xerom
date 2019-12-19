@@ -44,6 +44,7 @@ const (
         maxKnownNodeData = 1024  // Maximum node data to keep in known list (prevent DOS)
         maxKnownNodeDataMessages = 1024  // Maximum node data message records to keep in known list (prevent DOS)
         maxKnownSendNodePeerVerificationMessages = 1024  // Maximum node data message records to keep in known list (prevent DOS)
+        maxKnownSendNodeValidationMessages = 1024  // Maximum node data message records to keep in known list (prevent DOS)
 
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
@@ -95,6 +96,7 @@ type peer struct {
         knownNodeData                        mapset.Set
         knownNodeDataMessage                 mapset.Set
         knownSendNodePeerVerificationMessage mapset.Set
+        knownSendNodeValidationMessage       mapset.Set
 	queuedTxs   chan []*types.Transaction // Queue of transactions to broadcast to the peer
 	queuedProps chan *propEvent           // Queue of blocks to broadcast to the peer
 	queuedAnns  chan *types.Block         // Queue of blocks to announce to the peer
@@ -112,6 +114,7 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
                 knownNodeData:        mapset.NewSet(),
 		knownNodeDataMessage: mapset.NewSet(),
 		knownSendNodePeerVerificationMessage: mapset.NewSet(),
+		knownSendNodeValidationMessage: mapset.NewSet(),
 		queuedTxs:   make(chan []*types.Transaction, maxQueuedTxs),
 		queuedProps: make(chan *propEvent, maxQueuedProps),
 		queuedAnns:  make(chan *types.Block, maxQueuedAnns),
@@ -233,6 +236,15 @@ func (p *peer) MarkSendNodePeerVerification(number string) {
 	p.knownSendNodePeerVerificationMessage.Add(number)
 }
 
+// MarkSendNodeValidationMessage marks a NodeValidationMessage as known for the peer
+func (p *peer) MarkSendNodeValidation(number string) {
+	// If we reached the memory allowance, drop a previously known block hash
+	for p.knownSendNodeValidationMessage.Cardinality() >= maxKnownSendNodeValidationMessages {
+		p.knownSendNodeValidationMessage.Pop()
+	}
+	p.knownSendNodeValidationMessage.Add(number)
+}
+
 // SendTransactions sends transactions to the peer and includes the hashes
 // in its transaction hash set for future reference.
 func (p *peer) SendTransactions(txs types.Transactions) error {
@@ -329,6 +341,11 @@ func (p *peer) SendNodeProtocolPeerVerification(data []string) error {
 	return p2p.Send(p.rw, SendNodeProtocolPeerVerificationMsg, data)
 }
 
+// SendNodeProtocolValidation verifies a specific peer exists
+func (p *peer) SendNodeProtocolValidation(data []string) error {
+	return p2p.Send(p.rw, SendNodeProtocolValidationMsg, data)
+}
+
 // SendNodeDataRLP sends a batch of arbitrary internal data, corresponding to the
 // hashes requested.
 func (p *peer) SendNodeData(data [][]byte) error {
@@ -389,6 +406,12 @@ func (p *peer) RequestNodeProtocolSyncData(data []string) error {
 func (p *peer) RequestNodeProtocolPeerVerification(data []string) error {
 	//p.Log().Debug("Requesting Node Protocol Peer Verification", "Type", data[0], "Hash", data[1], "Number", data[2], "Peer", data[3])
 	return p2p.Send(p.rw, GetNodeProtocolPeerVerificationMsg, data)
+}
+
+// RequestNodeProtocolValidation requests validation of specific block validation data
+func (p *peer) RequestNodeProtocolValidation(data []string) error {
+	//p.Log().Debug("Requesting Node Protocol Peer Verification", "Type", data[0], "Number", data[1])
+	return p2p.Send(p.rw, GetNodeProtocolValidationMsg, data)
 }
 
 // RequestNodeData fetches a batch of arbitrary data from a node's known state
@@ -643,6 +666,19 @@ func (ps *peerSet) CheckPeerWithoutNodeDataMessage(peerId string, p *peer) bool 
 
         hash, _ := p.Head()
         if !p.knownNodeDataMessage.Contains(peerId + hash.String()) {
+			return true
+	}
+	return false
+}
+
+// CheckPeerWithoutValidationMessage retrieves a list of peers that do not have a given NodeValidationData in
+// their set of known data.
+func (ps *peerSet) CheckPeerWithoutValidationMessage(blockNumber string, p *peer) bool {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+        hash, _ := p.Head()
+        if !p.knownNodeValidationMessage.Contains(blockNumber + hash.String()) {
 			return true
 	}
 	return false
