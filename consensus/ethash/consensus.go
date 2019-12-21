@@ -597,11 +597,10 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			}
 
 			nodeCount := nodeprotocol.UpdateNodeCount(state, currentNodeCount, nodeType.CountCachingAddresses)
-			_, _, nodeAddress, nodeIdString, nodeIpString := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
+			_, _, nodeAddress, _, _ := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
 			//nodeId, nodeIp, nodeAddress, nodeIdString, nodeIpString := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
 
-			nodeIdArray = append(nodeIdArray, nodeIdString)
-			nodeIpArray = append(nodeIpArray, nodeIpString)
+			nodeValidationArray = append(nodeValidationArray, nodeValidationString)
 
 			if nodeCount > 0 {
 				totalNodeCount += nodeCount
@@ -632,8 +631,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 		}
 
 	}
-	params.NodeIdArray = nodeIdArray
-	params.NodeIpArray = nodeIpArray
+	params.NodeValidationArray = nodeValidationArray
 
 	// Accumulate any block and uncle rewards and commit the final state root
 	accumulateRewards(chain.Config(), state, header, uncles, nodeAddresses, nodeRemainders)

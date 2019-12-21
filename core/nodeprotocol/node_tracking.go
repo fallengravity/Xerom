@@ -63,17 +63,17 @@ func SetActiveNode(stack *node.Node) {
 }
 
 // CheckNodeStatus checks to see if the specified node has been validated
-func CheckNodeStatus(nodeType string, nodeId common.Hash, nodeIp common.Hash, blockNumber uint64) bool {
+func CheckNodeStatus(nodeType string, blockNumber uint64) bool {
 	blockNumberString := strconv.FormatUint(blockNumber, 10)
 
 	dataValidation, errValidation := chainDB.Get([]byte("validation" + nodeType + blockNumberString))
 	if errValidation == nil {
 		if common.BytesToHash(dataValidation) == common.BytesToHash([]byte("true")) {
-			log.Debug("Node Activity Validated", "Validated", "True", "Type", nodeType, "ID", nodeId, "IP", nodeIp)
+			log.Debug("Node Activity Validated", "Validated", "True", "Type", nodeType)
 			return true
 		}
 	}
-		log.Debug("Node Activity Validation Failed", "Validated", "False", "Type", nodeType, "ID", nodeId, "IP", nodeIp)
+		log.Debug("Node Activity Validation Failed", "Validated", "False", "Type", nodeType)
 	return false
 }
 

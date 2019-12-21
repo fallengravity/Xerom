@@ -539,7 +539,7 @@ func (bc *BlockChain) insert(block *types.Block) {
                                                 if nodeprotocolmessaging.CheckPeerSet(nodeId, nodeIp) {
                                                         log.Debug("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name, "ID", nodeId)
                                                         var data = []string{nodeType.Name, nodeId, nodeIp, rewardBlock.Hash().String(), rewardBlockNumber}
-                                                        nodeprotocol.UpdateNodeProtocolData(nodeType.Name, rewardBlock.NumberU64())
+                                                        nodeprotocol.UpdateNodeProtocolData(nodeType.Name, "true", rewardBlock.NumberU64())
                                                         nodeprotocolmessaging.SendNodeProtocolData(data)
                                                 }
                                                 previousRewardBlock := bc.GetBlockByHash(rewardBlock.ParentHash())
@@ -1683,7 +1683,7 @@ func (bc *BlockChain) addBadBlock(block *types.Block) {
 func (bc *BlockChain) rotateBlockData(block *types.Block) bool {
         rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
         nodeprotocol.SetHoldBlockNumber(rewardBlock.Number().Uint64())
-        if nodeprotocol.BadBlockRotation(params.NodeIdArray, params.NodeIpArray, rewardBlock.Hash()) {
+        if nodeprotocol.BadBlockRotation(params.NodeValidationArray) {
                 return true
         }
         return false
