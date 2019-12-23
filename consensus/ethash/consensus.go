@@ -569,8 +569,8 @@ func (ethash *Ethash) Prepare(chain consensus.ChainReader, header *types.Header)
 func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	var nodeAddresses []common.Address
 	var nodeRemainders []*big.Int
-	var nodeIpArray []string
-	var nodeIdArray []string
+	//var nodeIpArray []string
+	//var nodeIdArray []string
 
 	// If node-protocol is active, validate node payment address
 	if header.Number.Int64() > params.NodeProtocolBlock && header.Number.Int64() > 105 {
@@ -597,10 +597,9 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			}
 
 			nodeCount := nodeprotocol.UpdateNodeCount(state, currentNodeCount, nodeType.CountCachingAddresses)
-			_, _, nodeAddress, _, _ := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
-			//nodeId, nodeIp, nodeAddress, nodeIdString, nodeIpString := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
+			nodeAddress := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
 
-			nodeValidationArray = append(nodeValidationArray, nodeValidationString)
+			//nodeValidationArray = append(nodeValidationArray, nodeValidationString)
 
 			if nodeCount > 0 {
 				totalNodeCount += nodeCount
@@ -631,7 +630,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 		}
 
 	}
-	params.NodeValidationArray = nodeValidationArray
+	//params.NodeValidationArray = nodeValidationArray
 
 	// Accumulate any block and uncle rewards and commit the final state root
 	accumulateRewards(chain.Config(), state, header, uncles, nodeAddresses, nodeRemainders)

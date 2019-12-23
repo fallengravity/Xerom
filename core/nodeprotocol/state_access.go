@@ -141,12 +141,10 @@ func UpdateNodeCount(state *state.StateDB, currentNodeCount int64, countAddresse
 	return nodeCount
 }
 
-func UpdateNodeCandidate(state *state.StateDB, currentNodeId string, currentNodeIp string, currentNodeAddress common.Address, nodeIds []common.Address, nodeIps []common.Address, nodeAddresses []common.Address) (common.Hash, common.Hash, common.Address, string, string) {
+func UpdateNodeCandidate(state *state.StateDB, currentNodeId string, currentNodeIp string, currentNodeAddress common.Address, nodeIds []common.Address, nodeIps []common.Address, nodeAddresses []common.Address) (common.Address) {
 
 	var nodeId = common.BytesToHash(state.GetCode(nodeIds[len(nodeIds)-1]))
 	var nodeIp = common.BytesToHash(state.GetCode(nodeIps[len(nodeIps)-1]))
-	var nodeIdString = string(state.GetCode(nodeIds[len(nodeIds)-1]))
-	var nodeIpString = string(state.GetCode(nodeIps[len(nodeIps)-1]))
 	var rewardAddress = common.BytesToAddress(state.GetCode(nodeAddresses[len(nodeAddresses)-1]))
 
 	// Rotate addresses for caching behavior
@@ -161,5 +159,5 @@ func UpdateNodeCandidate(state *state.StateDB, currentNodeId string, currentNode
 
 	log.Debug("Updating Node Reward Candidates", "ID", nodeId, "IP", nodeIp, "Address", rewardAddress)
 
-	return nodeId, nodeIp, rewardAddress, nodeIdString, nodeIpString
+	return rewardAddress
 }

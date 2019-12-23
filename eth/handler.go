@@ -218,11 +218,11 @@ func (pm *ProtocolManager) removePeer(id string) {
 	}
 
 	// When peer count drops below min, rollback and resync
-	if pm.peers.Len() < minRequiredPeerCount && !nodeprotocolmessaging.GetSyncStatus() {
+	/*if pm.peers.Len() < minRequiredPeerCount && !nodeprotocolmessaging.GetSyncStatus() {
 		log.Warn("Dropped Below Minimum Peer Count - Syncing With Additional Peers", "Rollback Count", "50")
 		nodeprotocolmessaging.RollBackChain(50)
 		pm.synchronise(pm.peers.BestPeer())
-	}
+	}*/
 }
 
 func (pm *ProtocolManager) Start(maxPeers int) {
@@ -395,13 +395,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                 }
                 if len(nodeProtocolData) == 6 && nodeProtocolData[5] == "true" {
                         log.Trace("Sending Peer Verification Message", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[1], "Number", nodeProtocolData[2], "ID", nodeProtocolData[3] , "IP", nodeProtocolData[4])
-                        peerId := nodeprotocol.GetNodeId(p.Node())
                         blockNumber,_ := strconv.ParseUint(nodeProtocolData[2], 10, 64)
                         nodeprotocol.UpdateNodeProtocolData("true", nodeProtocolData[0], blockNumber)
-			var nodeValidationData []string
-			nodeValidationData[0] = nodeProtocolData[0]
-			nodeValidationData[1] = nodeProtocolData[2]
-			nodeValidationData[2] = nodeProtocolData[5]
+			var nodeValidationData = []string{nodeProtocolData[0], nodeProtocolData[2], nodeProtocolData[5]}
 			// [0] = node type, [1] - block number, [2] - validation message
                         pm.AsyncSendNodeProtocolValidation(nodeValidationData)
                 } else {
@@ -426,14 +422,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         blockNumber,_ := strconv.ParseUint(nodeProtocolData[4], 10, 64)
           	        if !nodeprotocol.CheckUpToDate(nodeProtocolData[0], blockNumber) {
                                 // Relay data to peerset
-				var nodeValidationData []string
-				nodeValidationData[0] = nodeProtocolData[0]
-				nodeValidationData[1] = nodeProtocolData[4]
-				nodeValidationData[2] = "true"
+				var nodeValidationData = []string{nodeProtocolData[0], nodeProtocolData[4], "true"}
 				// [0] = node type, [1] - block number, [2] - validation message
                                 pm.AsyncSendNodeProtocolValidation(nodeValidationData)
                         }
-                        peerId := nodeprotocol.GetNodeId(p.Peer.Node())
+                        //peerId := nodeprotocol.GetNodeId(p.Peer.Node())
                         nodeprotocol.UpdateNodeProtocolData("true", nodeProtocolData[0], blockNumber)
                 }
                 return nil
@@ -447,21 +440,22 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 
                 if len(nodeProtocolData) != 2 {
                         log.Error("Incorrectly Formatted Node Protocol Validation Message Received")
-                } else if pm.peers.CheckPeerWithoutNodeValidationMessage(nodeProtocolData[1] + nodeProtocolData[0], p) {
+                } else if pm.peers.CheckPeerWithoutValidationMessage(nodeProtocolData[0] + nodeProtocolData[1], p) {
 
-                        p.MarkNodeValidationMessage(nodeProtocolData[1] + nodeProtocolData[0])
+                        p.MarkNodeValidationMessage(nodeProtocolData[0] + nodeProtocolData[1])
 
                         log.Trace("Node Protocol Validation Request Received", "Type", nodeProtocolData[0], "Number", nodeProtocolData[1])
                         blockNumber,_ := strconv.ParseUint(nodeProtocolData[1], 10, 64)
-			if nodeprotocol.CheckUpToDate(nodeProtocolData[0], blockNumber) {
+			//if nodeprotocol.CheckUpToDate(nodeProtocolData[0], blockNumber) {
 
 				nodeValidation, err := nodeprotocol.GetNodeProtocolData(nodeProtocolData[0], blockNumber)
 				if err == nil {
 					data := []string{nodeProtocolData[0], nodeProtocolData[1], nodeValidation}
 					p.SendNodeProtocolValidation(data)
-					p.MarkSendNodeValidationMessage(nodeProtocolData[1] + nodeProtocolData[0])
+					//p.MarkSendNodeValidationMessage(nodeProtocolData[1] + nodeProtocolData[0])
 				}
-			}
+			//}
+		}
 		return nil
 
 	case msg.Code == SendNodeProtocolValidationMsg:
@@ -473,8 +467,8 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 
                 if len(nodeProtocolData) != 3 {
                         log.Error("Incorrectly Formatted Node Protocol Validation Message Received")
-                } else if pm.peers.CheckPeerWithoutNodeValidationMessage(nodeProtocolData[1] + nodeProtocolData[0], p) {
-                        p.MarkNodeValidationMessage(nodeProtocolData[1] + nodeProtocolData[0])
+                } else if pm.peers.CheckPeerWithoutSendValidationMessage(nodeProtocolData[0] + nodeProtocolData[1], p) {
+                        p.MarkSendNodeValidationMessage(nodeProtocolData[0] + nodeProtocolData[1])
 
                         log.Trace("Receieved Node Protocol Validation Message", "Type", nodeProtocolData[0], "Number", nodeProtocolData[1])
 	                // Check if we have updated node protocol data
@@ -483,7 +477,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				// [0] = node type, [1] - block number, [2] - validation message
                                 pm.AsyncSendNodeProtocolValidation(nodeProtocolData)
                         }
-                        peerId := nodeprotocol.GetNodeId(p.Peer.Node())
                         nodeprotocol.UpdateNodeProtocolData(nodeProtocolData[1], nodeProtocolData[0], blockNumber)
                 }
                 return nil
@@ -888,7 +881,7 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 	}
 }
 
-func (pm *ProtocolManager) AsyncSendNodeProtocolData(data []string) {
+/*func (pm *ProtocolManager) AsyncSendNodeProtocolData(data []string) {
         blockNumber := data[4]
         nodeType := data[0]
 	peers := pm.peers.PeersWithoutNodeData(nodeType + blockNumber)
@@ -896,9 +889,9 @@ func (pm *ProtocolManager) AsyncSendNodeProtocolData(data []string) {
 		peer.SendNodeProtocolData(data)
                 peer.MarkNodeData(nodeType + blockNumber)
 	}
-}
+}*/
 
-func (pm *ProtocolManager) AsyncSendNodeProtocolPeerVerification(data []string) {
+/*func (pm *ProtocolManager) AsyncSendNodeProtocolPeerVerification(data []string) {
         blockNumber := data[2]
         nodeType := data[0]
         peers := pm.peers.PeersWithoutSendNodePeerVerification(nodeType + blockNumber)
@@ -906,9 +899,24 @@ func (pm *ProtocolManager) AsyncSendNodeProtocolPeerVerification(data []string) 
                 peer.SendNodeProtocolPeerVerification(data)
                 peer.MarkSendNodePeerVerification(nodeType + blockNumber)
         }
+}*/
+
+func (pm *ProtocolManager) AsyncSendNodeProtocolValidation(data []string) {
+        blockNumber := data[1]
+        nodeType := data[0]
+        peers := pm.peers.PeersWithoutSendNodeProtocolValidation(nodeType + blockNumber)
+        for _, peer := range peers {
+                peer.SendNodeProtocolValidation(data)
+                peer.MarkSendNodeValidationMessage(nodeType + blockNumber)
+        }
 }
 
-func (pm *ProtocolManager) AsyncGetNodeProtocolPeerVerification(data []string) {
+func (pm *ProtocolManager) AsyncGetNodeProtocolValidation(data []string) {
+        peer := pm.peers.BestPeer()
+        peer.RequestNodeProtocolValidation(data)
+}
+
+/*func (pm *ProtocolManager) AsyncGetNodeProtocolPeerVerification(data []string) {
         peer := pm.peers.BestPeer()
         peer.RequestNodeProtocolPeerVerification(data)
 }
@@ -918,12 +926,12 @@ func (pm *ProtocolManager) AsyncGetNodeProtocolData(data []string) {
                 peer := pm.peers.BestPeer()
                 peer.RequestNodeProtocolData(data)
         }
-}
+}*/
 
-func (pm *ProtocolManager) AsyncGetNodeProtocolSyncData(data []string) {
+/*func (pm *ProtocolManager) AsyncGetNodeProtocolSyncData(data []string) {
         peer := pm.peers.BestPeer()
         peer.RequestNodeProtocolSyncData(data)
-}
+}*/
 
 // BroadcastTxs will propagate a batch of transactions to all peers which are not known to
 // already have the given transaction.

@@ -534,13 +534,11 @@ func (bc *BlockChain) insert(block *types.Block) {
                                                 nodeId, nodeIp, _, _ := nodeprotocol.GetNodeCandidate(state, rewardBlock.Hash(), nodeCount, nodeType.ContractAddress)
                                                 rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
 
-                                                selfId := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode().Server().Self())
-
                                                 if nodeprotocolmessaging.CheckPeerSet(nodeId, nodeIp) {
                                                         log.Debug("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name, "ID", nodeId)
-                                                        var data = []string{nodeType.Name, nodeId, nodeIp, rewardBlock.Hash().String(), rewardBlockNumber}
+                                                        var data = []string{nodeType.Name, rewardBlockNumber, "true"}
                                                         nodeprotocol.UpdateNodeProtocolData(nodeType.Name, "true", rewardBlock.NumberU64())
-                                                        nodeprotocolmessaging.SendNodeProtocolData(data)
+                                                        nodeprotocolmessaging.SendNodeProtocolValidation(data)
                                                 }
                                                 previousRewardBlock := bc.GetBlockByHash(rewardBlock.ParentHash())
                                                 if previousRewardBlock != nil && !nodeprotocol.CheckUpToDate(nodeType.Name, previousRewardBlock.NumberU64()) {
@@ -555,15 +553,15 @@ func (bc *BlockChain) insert(block *types.Block) {
 							} else {
 	                                                        log.Debug("Direct Node Connection Failed - Previous State Unavailable", "Type", nodeType.Name)
 							}
-                                	                var data = []string{nodeType.Name, previousRewardBlock.Hash().String(), previousRewardBlockNumber}
-                                        	        nodeprotocolmessaging.RequestNodeProtocolData(data)
+                                	                var data = []string{nodeType.Name, previousRewardBlockNumber}
+                                        	        nodeprotocolmessaging.RequestNodeProtocolValidation(data)
                                                 }
                                                 previousParentRewardBlock := bc.GetBlockByHash(previousRewardBlock.ParentHash())
                                                 if previousParentRewardBlock != nil && !nodeprotocol.CheckUpToDate(nodeType.Name, previousParentRewardBlock.NumberU64()) {
                                                         log.Debug("Requesting Previous Reward Parent Block Candidate Data", "Type", nodeType.Name)
                                                         previousParentRewardBlockNumber := strconv.FormatUint(previousParentRewardBlock.NumberU64(), 10)
-                                                        var data = []string{nodeType.Name, previousParentRewardBlock.Hash().String(), previousParentRewardBlockNumber}
-                                                        nodeprotocolmessaging.RequestNodeProtocolData(data)
+                                                        var data = []string{nodeType.Name, previousParentRewardBlockNumber}
+                                                        nodeprotocolmessaging.RequestNodeProtocolValidation(data)
                                                 }
                                         }
                                 }
@@ -1683,7 +1681,7 @@ func (bc *BlockChain) addBadBlock(block *types.Block) {
 func (bc *BlockChain) rotateBlockData(block *types.Block) bool {
         rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
         nodeprotocol.SetHoldBlockNumber(rewardBlock.Number().Uint64())
-        if nodeprotocol.BadBlockRotation(params.NodeValidationArray) {
+        if nodeprotocol.BadBlockRotation() {
                 return true
         }
         return false

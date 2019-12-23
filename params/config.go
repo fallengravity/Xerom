@@ -23,8 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-var NodeValidationArray []string
-
 // Main node type configuration for node-protocol
 var NodeTypes = []NodeType{
 	NodeType{

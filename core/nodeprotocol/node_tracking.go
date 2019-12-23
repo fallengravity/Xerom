@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -69,12 +70,18 @@ func CheckNodeStatus(nodeType string, blockNumber uint64) bool {
 	dataValidation, errValidation := chainDB.Get([]byte("validation" + nodeType + blockNumberString))
 	if errValidation == nil {
 		if common.BytesToHash(dataValidation) == common.BytesToHash([]byte("true")) {
-			log.Debug("Node Activity Validated", "Validated", "True", "Type", nodeType)
+			log.Debug("Node Status Validated", "Node Activity", "True", "Type", nodeType)
+			return true
+		} else if common.BytesToHash(dataValidation) == common.BytesToHash([]byte("validatedfalse")) {
+			log.Debug("Node Status Validated", "Node Activity", "False", "Type", nodeType)
+			return false
+		} else if common.BytesToHash(dataValidation) == common.BytesToHash([]byte("false")) {
+			log.Debug("Node Status Validion Unconfirmed", "Node Activity", "Unknown", "Type", nodeType)
 			return true
 		}
 	}
-		log.Debug("Node Activity Validation Failed", "Validated", "False", "Type", nodeType)
-	return false
+	log.Debug("Node Status Validation Failed", "Node Activity", "Unknown", "Type", nodeType)
+	return true
 }
 
 // CheckUpToDate checks to see if blockHash has been recorded in the mapping
@@ -82,8 +89,14 @@ func CheckUpToDate(nodeType string, blockNumber uint64) bool {
 	blockNumberString := strconv.FormatUint(blockNumber, 10)
 
 	dataValidation, errValidation := chainDB.Get([]byte("validation" + nodeType + blockNumberString))
-	if errValidation == nil && common.BytesToHash(dataValidation) == common.BytesToHash([]byte("true")) {
-		return true
+	if errValidation == nil {
+		if common.BytesToHash(dataValidation) == common.BytesToHash([]byte("true")) {
+			return true
+		} else if common.BytesToHash(dataValidation) == common.BytesToHash([]byte("false")) {
+			return false
+		} else if common.BytesToHash(dataValidation) == common.BytesToHash([]byte("validatedfalse")) {
+			return true
+		}
 	}
 	return false
 }
@@ -111,32 +124,30 @@ func ResetHoldBlockCount() {
 	HoldBlockCount = 0
 }
 
-func BadBlockRotation(nodeValidations []string) bool {
+func BadBlockRotation() bool {
 
-	if len(nodeValidations) == len(params.NodeTypes) {
-		binaryString := strconv.FormatInt(HoldBlockCount, 2)
-		for len(binaryString) < 4 {
-			binaryString = "0" + binaryString
-		}
-
-		binaryArray := strings.Split(binaryString, "")
-		nodeTypeCount := len(params.NodeTypes)
-		for key := (nodeTypeCount - 1); key >= 0; key-- {
-			nodeType := params.NodeTypes[key]
-			RemoveNodeProtocolData(nodeType.Name, HoldBlockNumber)
-			if binaryArray[key] == "1" {
-			} else if binaryArray[key] == "0" {
-				chainDB.Put([]byte("validation"+nodeType.Name+HoldBlockNumber), []byte(nodeValidations[key]))
-				log.Debug("Bad Block Rotation - Node Protocol Data Updated", "Type", nodeType.Name)
-			}
-		}
-		HoldBlockCount++
-		if HoldBlockCount > 15 {
-			HoldBlockCount = 0
-		}
-		return true
+	binaryString := strconv.FormatInt(HoldBlockCount, 2)
+	for len(binaryString) < len(params.NodeTypes) {
+		binaryString = "0" + binaryString
 	}
-	return false
+	binaryArray := strings.Split(binaryString, "")
+	nodeTypeCount := len(params.NodeTypes)
+	for key := (nodeTypeCount - 1); key >= 0; key-- {
+		nodeType := params.NodeTypes[key]
+		RemoveNodeProtocolData(nodeType.Name, HoldBlockNumber)
+		if binaryArray[key] == "1" {
+			chainDB.Put([]byte("validation"+nodeType.Name+HoldBlockNumber), []byte("false"))
+			log.Debug("Bad Block Rotation - Node Protocol Data Updated", "Type", nodeType.Name)
+		} else if binaryArray[key] == "0" {
+			chainDB.Put([]byte("validation"+nodeType.Name+HoldBlockNumber), []byte("true"))
+			log.Debug("Bad Block Rotation - Node Protocol Data Updated", "Type", nodeType.Name)
+		}
+	}
+	HoldBlockCount++
+	if HoldBlockCount > (int64(math.Pow(2, float64(len(params.NodeTypes)))) - 1) {
+		HoldBlockCount = 0
+	}
+	return true
 }
 
 // UpdateNodeProtocolData updates protocol mapping data for verified nodes
@@ -144,8 +155,21 @@ func UpdateNodeProtocolData(nodeType string, validationValue string, blockNumber
 	blockNumberString := strconv.FormatUint(blockNumber, 10)
 
 	if blockNumberString != HoldBlockNumber {
-		chainDB.Put([]byte("validation"+nodeType+blockNumberString), []byte(validationValue))
-		log.Debug("Node Protocol Data Updated", "Type", nodeType, "Number", blockNumberString)
+		if validationValue == "true" {
+			chainDB.Put([]byte("validation"+nodeType+blockNumberString), []byte(validationValue))
+			log.Debug("Node Protocol Data Updated", "Type", nodeType, "Number", blockNumberString)
+		} else {
+			dataValidation, errValidation := chainDB.Get([]byte("validation" + nodeType + blockNumberString))
+			if errValidation == nil {
+				if validationValue == "false"  && (string(dataValidation) == "false" || string(dataValidation) == "validatedfalse") {
+					chainDB.Put([]byte("validation"+nodeType+blockNumberString), []byte("validatedfalse"))
+					log.Debug("Node Protocol Data Updated", "Type", nodeType, "Number", blockNumberString)
+				}
+			} else {
+				chainDB.Put([]byte("validation"+nodeType+blockNumberString), []byte("false"))
+				log.Debug("Node Protocol Data Updated", "Type", nodeType, "Number", blockNumberString)
+			}
+		}
 	}
 }
 

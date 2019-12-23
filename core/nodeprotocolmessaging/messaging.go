@@ -34,10 +34,10 @@ var Syncing bool
 
 type Manager interface {
 	SyncStatus() bool
-	AsyncGetNodeProtocolData(data []string)
-	AsyncSendNodeProtocolData(data []string)
-	AsyncGetNodeProtocolSyncData(data []string)
-	AsyncGetNodeProtocolPeerVerification(data []string)
+	AsyncGetNodeProtocolValidation(data []string)
+	AsyncSendNodeProtocolValidation(data []string)
+	//AsyncGetNodeProtocolSyncData(data []string)
+	//AsyncGetNodeProtocolPeerVerification(data []string)
 }
 
 type PeerSet interface {
@@ -117,21 +117,21 @@ func GetPeerCount() int {
 	return peerSet.Len()
 }
 
-func RequestNodeProtocolData(data []string) {
-	pm.AsyncGetNodeProtocolData(data)
+func RequestNodeProtocolValidation(data []string) {
+	pm.AsyncGetNodeProtocolValidation(data)
 }
 
-func SendNodeProtocolData(data []string) {
-	pm.AsyncSendNodeProtocolData(data)
+func SendNodeProtocolValidation(data []string) {
+	pm.AsyncSendNodeProtocolValidation(data)
 }
 
-func RequestNodeProtocolSyncData(data []string) {
+/*func RequestNodeProtocolSyncData(data []string) {
 	pm.AsyncGetNodeProtocolSyncData(data)
-}
+}*/
 
-func RequestNodeProtocolPeerVerification(data []string) {
+/*func RequestNodeProtocolPeerVerification(data []string) {
 	pm.AsyncGetNodeProtocolPeerVerification(data)
-}
+}*/
 
 func GetSyncStatus() bool {
 	if Syncing {
