@@ -907,8 +907,10 @@ func (pm *ProtocolManager) AsyncSendNodeProtocolValidation(data []string) {
         	nodeType := data[0]
      		peers := pm.peers.PeersWithoutSendNodeProtocolValidation(nodeType + blockNumber)
        		for _, peer := range peers {
-                	peer.SendNodeProtocolValidation(data)
-                	peer.MarkSendNodeValidationMessage(nodeType + blockNumber)
+			if peer.version >= etho64 {
+	                	peer.SendNodeProtocolValidation(data)
+        	        	peer.MarkSendNodeValidationMessage(nodeType + blockNumber)
+			}
         	}
 	}
 }
@@ -916,7 +918,7 @@ func (pm *ProtocolManager) AsyncSendNodeProtocolValidation(data []string) {
 func (pm *ProtocolManager) AsyncGetNodeProtocolValidation(data []string) {
 	if len(data) > 0 {
 	        peer := pm.peers.BestPeer()
-		if peer != nil {
+		if peer != nil && peer.version >= etho64 {
 	        	peer.RequestNodeProtocolValidation(data)
 		}
 	}
