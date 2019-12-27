@@ -902,18 +902,24 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 }*/
 
 func (pm *ProtocolManager) AsyncSendNodeProtocolValidation(data []string) {
-        blockNumber := data[1]
-        nodeType := data[0]
-        peers := pm.peers.PeersWithoutSendNodeProtocolValidation(nodeType + blockNumber)
-        for _, peer := range peers {
-                peer.SendNodeProtocolValidation(data)
-                peer.MarkSendNodeValidationMessage(nodeType + blockNumber)
-        }
+	if len(data) >= 2 {
+	        blockNumber := data[1]
+        	nodeType := data[0]
+     		peers := pm.peers.PeersWithoutSendNodeProtocolValidation(nodeType + blockNumber)
+       		for _, peer := range peers {
+                	peer.SendNodeProtocolValidation(data)
+                	peer.MarkSendNodeValidationMessage(nodeType + blockNumber)
+        	}
+	}
 }
 
 func (pm *ProtocolManager) AsyncGetNodeProtocolValidation(data []string) {
-        peer := pm.peers.BestPeer()
-        peer.RequestNodeProtocolValidation(data)
+	if len(data) > 0 {
+	        peer := pm.peers.BestPeer()
+		if peer != nil {
+	        	peer.RequestNodeProtocolValidation(data)
+		}
+	}
 }
 
 /*func (pm *ProtocolManager) AsyncGetNodeProtocolPeerVerification(data []string) {

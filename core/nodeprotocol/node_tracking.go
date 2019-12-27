@@ -136,7 +136,7 @@ func BadBlockRotation() bool {
 		nodeType := params.NodeTypes[key]
 		RemoveNodeProtocolData(nodeType.Name, HoldBlockNumber)
 		if binaryArray[key] == "1" {
-			chainDB.Put([]byte("validation"+nodeType.Name+HoldBlockNumber), []byte("false"))
+			chainDB.Put([]byte("validation"+nodeType.Name+HoldBlockNumber), []byte("validatedfalse"))
 			log.Debug("Bad Block Rotation - Node Protocol Data Updated", "Type", nodeType.Name)
 		} else if binaryArray[key] == "0" {
 			chainDB.Put([]byte("validation"+nodeType.Name+HoldBlockNumber), []byte("true"))

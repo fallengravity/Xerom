@@ -93,12 +93,12 @@ func SetPeerSet(ps PeerSet) {
 	peerSet = ps
 }
 
-func RollBackChain(count uint64) {
+/*func RollBackChain(count uint64) {
 	currentBlockNumber := bc.CurrentBlock().Header().Number.Uint64()
 	newHeadBlock := bc.GetBlockByNumber(currentBlockNumber - count)
 	bc.SetCurrentBlock(newHeadBlock)
         bc.SetCurrentFastBlock(newHeadBlock)
-}
+}*/
 
 func CheckPeerSet(id string, ip string) bool {
 	ipMap := peerSet.Ips()
