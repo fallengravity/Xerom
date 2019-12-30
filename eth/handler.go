@@ -242,7 +242,7 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	go pm.txsyncLoop()
 }
 
-func (pm *ProtocolManager) NodeProtocolSync() {
+/*func (pm *ProtocolManager) NodeProtocolSync() {
         var from uint64
         currentBlock := pm.blockchain.CurrentBlock().NumberU64()
         if currentBlock > uint64(205) {
@@ -257,7 +257,7 @@ func (pm *ProtocolManager) NodeProtocolSync() {
                         go peer.RequestNodeProtocolSyncData(data)
                 }
         }
-}
+}*/
 
 func (pm *ProtocolManager) Stop() {
 	log.Info("Stopping Ethereum protocol")
@@ -397,9 +397,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         log.Trace("Sending Peer Verification Message", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[1], "Number", nodeProtocolData[2], "ID", nodeProtocolData[3] , "IP", nodeProtocolData[4])
                         blockNumber,_ := strconv.ParseUint(nodeProtocolData[2], 10, 64)
                         nodeprotocol.UpdateNodeProtocolData("true", nodeProtocolData[0], blockNumber)
-			var nodeValidationData = []string{nodeProtocolData[0], nodeProtocolData[2], nodeProtocolData[5]}
+			//var nodeValidationData = []string{nodeProtocolData[0], nodeProtocolData[2], nodeProtocolData[5]}
 			// [0] = node type, [1] - block number, [2] - validation message
-                        pm.AsyncSendNodeProtocolValidation(nodeValidationData)
+                        //pm.AsyncSendNodeProtocolValidation(nodeValidationData)
                 } else {
                         log.Error("Incorrectly Formatted SendNodeProtocolPeerVerificationMsg")
                 }
@@ -420,18 +420,18 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         log.Trace("Receieved Node Protocol Data Message", "Type", nodeProtocolData[0], "Hash", nodeProtocolData[3], "Number", nodeProtocolData[4], "ID", nodeProtocolData[1], "IP", nodeProtocolData[2])
 	                // Check if we have updated node protocol data
                         blockNumber,_ := strconv.ParseUint(nodeProtocolData[4], 10, 64)
-          	        if !nodeprotocol.CheckUpToDate(nodeProtocolData[0], blockNumber) {
+          	        /*if !nodeprotocol.CheckUpToDate(nodeProtocolData[0], blockNumber) {
                                 // Relay data to peerset
-				var nodeValidationData = []string{nodeProtocolData[0], nodeProtocolData[4], "true"}
+				//var nodeValidationData = []string{nodeProtocolData[0], nodeProtocolData[4], "true"}
 				// [0] = node type, [1] - block number, [2] - validation message
-                                pm.AsyncSendNodeProtocolValidation(nodeValidationData)
-                        }
+                                //pm.AsyncSendNodeProtocolValidation(nodeValidationData)
+                        }*/
                         //peerId := nodeprotocol.GetNodeId(p.Peer.Node())
                         nodeprotocol.UpdateNodeProtocolData("true", nodeProtocolData[0], blockNumber)
                 }
                 return nil
 
-	case msg.Code == GetNodeProtocolValidationMsg:
+	/*case msg.Code == GetNodeProtocolValidationMsg:
 
                 var nodeProtocolData []string
 		if err := msg.Decode(&nodeProtocolData); err != nil {
@@ -445,18 +445,18 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         p.MarkNodeValidationMessage(nodeProtocolData[0] + nodeProtocolData[1])
 
                         log.Trace("Node Protocol Validation Request Received", "Type", nodeProtocolData[0], "Number", nodeProtocolData[1])
-                        blockNumber,_ := strconv.ParseUint(nodeProtocolData[1], 10, 64)
+                        //blockNumber,_ := strconv.ParseUint(nodeProtocolData[1], 10, 64)
 			//if nodeprotocol.CheckUpToDate(nodeProtocolData[0], blockNumber) {
 
-				nodeValidation, err := nodeprotocol.GetNodeProtocolData(nodeProtocolData[0], blockNumber)
-				if err == nil {
-					data := []string{nodeProtocolData[0], nodeProtocolData[1], nodeValidation}
-					p.SendNodeProtocolValidation(data)
+				//nodeValidation, err := nodeprotocol.GetNodeProtocolData(nodeProtocolData[0], blockNumber)
+				//if err == nil {
+					//data := []string{nodeProtocolData[0], nodeProtocolData[1], nodeValidation}
+					//p.SendNodeProtocolValidation(data)
 					//p.MarkSendNodeValidationMessage(nodeProtocolData[1] + nodeProtocolData[0])
-				}
+				//}
 			//}
 		}
-		return nil
+		return nil*/
 
 	case msg.Code == SendNodeProtocolValidationMsg:
 
@@ -473,10 +473,10 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         log.Trace("Receieved Node Protocol Validation Message", "Type", nodeProtocolData[0], "Number", nodeProtocolData[1])
 	                // Check if we have updated node protocol data
                         blockNumber,_ := strconv.ParseUint(nodeProtocolData[1], 10, 64)
-          	        if !nodeprotocol.CheckUpToDate(nodeProtocolData[0], blockNumber) {
+          	        //if !nodeprotocol.CheckUpToDate(nodeProtocolData[0], blockNumber) {
 				// [0] = node type, [1] - block number, [2] - validation message
-                                pm.AsyncSendNodeProtocolValidation(nodeProtocolData)
-                        }
+                                //pm.AsyncSendNodeProtocolValidation(nodeProtocolData)
+                        //}
                         nodeprotocol.UpdateNodeProtocolData(nodeProtocolData[1], nodeProtocolData[0], blockNumber)
                 }
                 return nil
@@ -637,6 +637,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			hash   common.Hash
 			bytes  int
 			bodies []rlp.RawValue
+			validations [][]string
 		)
 		for bytes < softResponseLimit && len(bodies) < downloader.MaxBlockFetch {
 			// Retrieve the hash of the next block
@@ -649,33 +650,82 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			if data := pm.blockchain.GetBodyRLP(hash); len(data) != 0 {
 				bodies = append(bodies, data)
 				bytes += len(data)
+				if p.version >= etho64 {
+					blockNumber := nodeprotocolmessaging.GetBlockByHash(hash).NumberU64()
+					validation := nodeprotocol.GetValidation(blockNumber)
+					blockNumberString := strconv.FormatUint(blockNumber, 10)
+					validation = append(validation, blockNumberString)
+					validations = append(validations, validation)
+				}
 			}
+		}
+		if p.version >= etho64 && len(validations) > 0 {
+			var decodedBodies blockBodiesData
+			if err := msg.Decode(&decodedBodies); err != nil {
+			}
+			combined := blockBodyValidations{Bodies:decodedBodies, Validations:validations}
+			return p.SendBlockBodiesWithValidationsRLP(combined)
 		}
 		return p.SendBlockBodiesRLP(bodies)
 
 	case msg.Code == BlockBodiesMsg:
 		// A batch of block bodies arrived to one of our previous requests
 		var request blockBodiesData
-		if err := msg.Decode(&request); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		// Deliver them all to the downloader for queuing
-		transactions := make([][]*types.Transaction, len(request))
-		uncles := make([][]*types.Header, len(request))
+		var requestWithValidations blockBodyValidations
 
-		for i, body := range request {
-			transactions[i] = body.Transactions
-			uncles[i] = body.Uncles
-		}
-		// Filter out any explicitly requested bodies, deliver the rest to the downloader
-		filter := len(transactions) > 0 || len(uncles) > 0
-		if filter {
-			transactions, uncles = pm.fetcher.FilterBodies(p.id, transactions, uncles, time.Now())
-		}
-		if len(transactions) > 0 || len(uncles) > 0 || !filter {
-			err := pm.downloader.DeliverBodies(p.id, transactions, uncles)
-			if err != nil {
-				log.Debug("Failed to deliver bodies", "err", err)
+		if p.version >= etho64 {
+			if err := msg.Decode(&requestWithValidations); err != nil {
+				return errResp(ErrDecode, "msg %v: %v", msg, err)
+			}
+			// Deliver them all to the downloader for queuing
+			transactions := make([][]*types.Transaction, len(requestWithValidations.Bodies))
+			uncles := make([][]*types.Header, len(requestWithValidations.Bodies))
+			validations := make([][]string, len(requestWithValidations.Validations))
+
+			for i, body := range requestWithValidations.Bodies {
+				transactions[i] = body.Transactions
+				uncles[i] = body.Uncles
+			}
+
+			for i, validation := range requestWithValidations.Validations {
+				validations[i] = validation
+			}
+
+			//Deliver validations to statedb if peer version allows
+			nodeprotocol.DeliverValidations(validations)
+			// Filter out any explicitly requested bodies, deliver the rest to the downloader
+			filter := len(transactions) > 0 || len(uncles) > 0
+			if filter {
+				transactions, uncles = pm.fetcher.FilterBodies(p.id, transactions, uncles, time.Now())
+			}
+			if len(transactions) > 0 || len(uncles) > 0 || !filter {
+				err := pm.downloader.DeliverBodies(p.id, transactions, uncles)
+				if err != nil {
+					log.Debug("Failed to deliver bodies", "err", err)
+				}
+			}
+		} else {
+			if err := msg.Decode(&request); err != nil {
+				return errResp(ErrDecode, "msg %v: %v", msg, err)
+			}
+			// Deliver them all to the downloader for queuing
+			transactions := make([][]*types.Transaction, len(request))
+			uncles := make([][]*types.Header, len(request))
+
+			for i, body := range request {
+				transactions[i] = body.Transactions
+				uncles[i] = body.Uncles
+			}
+			// Filter out any explicitly requested bodies, deliver the rest to the downloader
+			filter := len(transactions) > 0 || len(uncles) > 0
+			if filter {
+				transactions, uncles = pm.fetcher.FilterBodies(p.id, transactions, uncles, time.Now())
+			}
+			if len(transactions) > 0 || len(uncles) > 0 || !filter {
+				err := pm.downloader.DeliverBodies(p.id, transactions, uncles)
+				if err != nil {
+					log.Debug("Failed to deliver bodies", "err", err)
+				}
 			}
 		}
 
@@ -787,33 +837,72 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	case msg.Code == NewBlockMsg:
 		// Retrieve and decode the propagated block
 		var request newBlockData
-		if err := msg.Decode(&request); err != nil {
-			return errResp(ErrDecode, "%v: %v", msg, err)
-		}
-		request.Block.ReceivedAt = msg.ReceivedAt
-		request.Block.ReceivedFrom = p
+		var requestWithValidations newBlockValidationsData
 
-		// Mark the peer as owning the block and schedule it for import
-		p.MarkBlock(request.Block.Hash())
-		pm.fetcher.Enqueue(p.id, request.Block)
-
-		// Assuming the block is importable by the peer, but possibly not yet done so,
-		// calculate the head hash and TD that the peer truly must have.
-		var (
-			trueHead = request.Block.ParentHash()
-			trueTD   = new(big.Int).Sub(request.TD, request.Block.Difficulty())
-		)
-		// Update the peer's total difficulty if better than the previous
-		if _, td := p.Head(); trueTD.Cmp(td) > 0 {
-			p.SetHead(trueHead, trueTD)
-
-			// Schedule a sync if above ours. Note, this will not fire a sync for a gap of
-			// a single block (as the true TD is below the propagated block), however this
-			// scenario should easily be covered by the fetcher.
-			currentBlock := pm.blockchain.CurrentBlock()
-			if trueTD.Cmp(pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())) > 0 {
-				go pm.synchronise(p)
+		if p.version >= etho64 {
+			if err := msg.Decode(&requestWithValidations); err != nil {
+				return errResp(ErrDecode, "%v: %v", msg, err)
 			}
+			requestWithValidations.Block.ReceivedAt = msg.ReceivedAt
+			requestWithValidations.Block.ReceivedFrom = p
+
+			// Mark the peer as owning the block and schedule it for import
+			p.MarkBlock(requestWithValidations.Block.Hash())
+			pm.fetcher.Enqueue(p.id, requestWithValidations.Block)
+
+			//Deliver validations to statedb if peer version allows
+			validations := [][]string{requestWithValidations.Validations}
+			nodeprotocol.DeliverValidations(validations)
+
+			// Assuming the block is importable by the peer, but possibly not yet done so,
+			// calculate the head hash and TD that the peer truly must have.
+			var (
+				trueHead = requestWithValidations.Block.ParentHash()
+				trueTD   = new(big.Int).Sub(requestWithValidations.TD, requestWithValidations.Block.Difficulty())
+			)
+			// Update the peer's total difficulty if better than the previous
+			if _, td := p.Head(); trueTD.Cmp(td) > 0 {
+				p.SetHead(trueHead, trueTD)
+
+				// Schedule a sync if above ours. Note, this will not fire a sync for a gap of
+				// a single block (as the true TD is below the propagated block), however this
+				// scenario should easily be covered by the fetcher.
+				currentBlock := pm.blockchain.CurrentBlock()
+				if trueTD.Cmp(pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())) > 0 {
+					go pm.synchronise(p)
+				}
+			}
+
+		} else {
+			if err := msg.Decode(&request); err != nil {
+				return errResp(ErrDecode, "%v: %v", msg, err)
+			}
+			request.Block.ReceivedAt = msg.ReceivedAt
+			request.Block.ReceivedFrom = p
+
+			// Mark the peer as owning the block and schedule it for import
+			p.MarkBlock(request.Block.Hash())
+			pm.fetcher.Enqueue(p.id, request.Block)
+
+			// Assuming the block is importable by the peer, but possibly not yet done so,
+			// calculate the head hash and TD that the peer truly must have.
+			var (
+				trueHead = request.Block.ParentHash()
+				trueTD   = new(big.Int).Sub(request.TD, request.Block.Difficulty())
+			)
+			// Update the peer's total difficulty if better than the previous
+			if _, td := p.Head(); trueTD.Cmp(td) > 0 {
+				p.SetHead(trueHead, trueTD)
+
+				// Schedule a sync if above ours. Note, this will not fire a sync for a gap of
+				// a single block (as the true TD is below the propagated block), however this
+				// scenario should easily be covered by the fetcher.
+				currentBlock := pm.blockchain.CurrentBlock()
+				if trueTD.Cmp(pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())) > 0 {
+					go pm.synchronise(p)
+				}
+			}
+
 		}
 
 	case msg.Code == TxMsg:
@@ -866,8 +955,18 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 			transferLen = len(peers)
 		}
 		transfer := peers[:transferLen]
+
+		//blockNumber := nodeprotocolmessaging.GetBlockByHash(hash).NumberU64()
+		validation := nodeprotocol.GetValidation(block.NumberU64())
+		blockNumberString := strconv.FormatUint(block.NumberU64(), 10)
+		validation = append(validation, blockNumberString)
+
 		for _, peer := range transfer {
-			peer.AsyncSendNewBlock(block, td)
+			if peer.version >= etho64 {
+				peer.AsyncSendNewBlockWithValidation(block, td, validation)
+			} else {
+				peer.AsyncSendNewBlock(block, td)
+			}
 		}
 		log.Trace("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 		return

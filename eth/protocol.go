@@ -184,10 +184,23 @@ type newBlockData struct {
 	TD    *big.Int
 }
 
+// newBlockWithValidationData is the network packet for the block propagation message with validation data.
+type newBlockValidationsData struct {
+	Block *types.Block
+	TD    *big.Int
+	Validations []string
+}
+
 // blockBody represents the data content of a single block.
 type blockBody struct {
 	Transactions []*types.Transaction // Transactions contained within a block
 	Uncles       []*types.Header      // Uncles contained within a block
+}
+
+// blockBodyValidations represents the data content of a single block with validations.
+type blockBodyValidations struct {
+	Bodies       []*blockBody
+	Validations  [][]string           // Validations contained within a block
 }
 
 // blockBodiesData is the network packet for block content distribution.

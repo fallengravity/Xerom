@@ -77,6 +77,7 @@ type PeerInfo struct {
 type propEvent struct {
 	block *types.Block
 	td    *big.Int
+	validation []string
 }
 
 type peer struct {
@@ -138,8 +139,14 @@ func (p *peer) broadcast() {
 			p.Log().Trace("Broadcast transactions", "count", len(txs))
 
 		case prop := <-p.queuedProps:
-			if err := p.SendNewBlock(prop.block, prop.td); err != nil {
-				return
+			if p.version >= etho64 {
+				if err := p.SendNewBlockWithValidation(prop.block, prop.td, prop.validation); err != nil {
+					return
+				}
+			} else {
+				if err := p.SendNewBlock(prop.block, prop.td); err != nil {
+					return
+				}
 			}
 			p.Log().Trace("Propagated block", "number", prop.block.Number(), "hash", prop.block.Hash(), "td", prop.td)
 
@@ -311,11 +318,28 @@ func (p *peer) SendNewBlock(block *types.Block, td *big.Int) error {
 	return p2p.Send(p.rw, NewBlockMsg, []interface{}{block, td})
 }
 
+// SendNewBlockWithValidation propagates an entire block with validations to a remote peer.
+func (p *peer) SendNewBlockWithValidation(block *types.Block, td *big.Int, validation []string) error {
+	p.knownBlocks.Add(block.Hash())
+	return p2p.Send(p.rw, NewBlockMsg, []interface{}{block, td, validation})
+}
+
 // AsyncSendNewBlock queues an entire block for propagation to a remote peer. If
 // the peer's broadcast queue is full, the event is silently dropped.
 func (p *peer) AsyncSendNewBlock(block *types.Block, td *big.Int) {
 	select {
 	case p.queuedProps <- &propEvent{block: block, td: td}:
+		p.knownBlocks.Add(block.Hash())
+	default:
+		p.Log().Debug("Dropping block propagation", "number", block.NumberU64(), "hash", block.Hash())
+	}
+}
+
+// AsyncSendNewBlockWithValidation queues an entire block with validations for propagation to a remote peer. If
+// the peer's broadcast queue is full, the event is silently dropped.
+func (p *peer) AsyncSendNewBlockWithValidation(block *types.Block, td *big.Int, validation []string) {
+	select {
+	case p.queuedProps <- &propEvent{block: block, td: td, validation: validation}:
 		p.knownBlocks.Add(block.Hash())
 	default:
 		p.Log().Debug("Dropping block propagation", "number", block.NumberU64(), "hash", block.Hash())
@@ -336,6 +360,12 @@ func (p *peer) SendBlockBodies(bodies []*blockBody) error {
 // an already RLP encoded format.
 func (p *peer) SendBlockBodiesRLP(bodies []rlp.RawValue) error {
 	return p2p.Send(p.rw, BlockBodiesMsg, bodies)
+}
+
+// SendBlockBodiesWithValidationsRLP sends a batch of block contents to the remote peer from
+// an already RLP encoded format with validations
+func (p *peer) SendBlockBodiesWithValidationsRLP(bodiesWithValidations blockBodyValidations) error {
+	return p2p.Send(p.rw, BlockBodiesMsg, bodiesWithValidations)
 }
 
 // SendNodeProtocolData sends a specific node types data
@@ -400,25 +430,26 @@ func (p *peer) RequestBodies(hashes []common.Hash) error {
 
 // RequestNodeProtocolData fetches a specific hash/state of node data of a specific
 // node type
-func (p *peer) RequestNodeProtocolData(data []string) error {
+/*func (p *peer) RequestNodeProtocolData(data []string) error {
 	//p.Log().Debug("Requesting Node Protocol Data", "Type", data[0], "Hash", data[1], "Number", data[2])
         if len(data) > 0 {
         	return p2p.Send(p.rw, GetNodeProtocolDataMsg, data)
         }
         return nil
-}
+}*/
 
 // RequestNodeProtocolSyncData requests initial node validation data on sync
 func (p *peer) RequestNodeProtocolSyncData(data []string) error {
 	//p.Log().Debug("Requesting Node Protocol Data Sync", "Type", data[0], "Number", data[1], "Count", data[2])
-	return p2p.Send(p.rw, GetNodeProtocolSyncDataMsg, data)
+	//return p2p.Send(p.rw, GetNodeProtocolSyncDataMsg, data)
+	return nil
 }
 
 // RequestNodeProtocolPeerVerification requests verification of specific peer
-func (p *peer) RequestNodeProtocolPeerVerification(data []string) error {
+/*func (p *peer) RequestNodeProtocolPeerVerification(data []string) error {
 	//p.Log().Debug("Requesting Node Protocol Peer Verification", "Type", data[0], "Hash", data[1], "Number", data[2], "Peer", data[3])
 	return p2p.Send(p.rw, GetNodeProtocolPeerVerificationMsg, data)
-}
+}*/
 
 // RequestNodeProtocolValidation requests validation of specific block validation data
 func (p *peer) RequestNodeProtocolValidation(data []string) error {

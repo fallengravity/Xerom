@@ -107,11 +107,21 @@ func GetNodeProtocolData(nodeType string, blockNumber uint64) (string, error) {
 
 	dataValidation, errValidation := chainDB.Get([]byte("validation" + nodeType + blockNumberString))
 	if errValidation != nil {
-		log.Error("Node Protocol Database Error", "Validation", string(dataValidation), "Error", errValidation)
+		log.Debug("Node Protocol Database Error", "Validation", string(dataValidation), "Error", errValidation)
 		return "", errors.New("Node Protocol Id Data Not Found")
 	}
 
 	return string(dataValidation), nil
+}
+
+// GetValidation returns specific blocks node validations
+func GetValidation(blockNumber uint64) []string {
+	var validations []string
+	for _, nodeType := range params.NodeTypes {
+		validation, _ := GetNodeProtocolData(nodeType.Name, blockNumber)
+		validations = append(validations, validation)
+	}
+	return validations
 }
 
 // Set bad block data tracker by block number
@@ -154,20 +164,35 @@ func BadBlockRotation() bool {
 func UpdateNodeProtocolData(nodeType string, validationValue string, blockNumber uint64) {
 	blockNumberString := strconv.FormatUint(blockNumber, 10)
 
-	if blockNumberString != HoldBlockNumber {
+	//if blockNumberString != HoldBlockNumber {
 		if validationValue == "true" {
 			chainDB.Put([]byte("validation"+nodeType+blockNumberString), []byte(validationValue))
 			log.Debug("Node Protocol Data Updated", "Type", nodeType, "Number", blockNumberString)
+			return
 		} else {
 			dataValidation, errValidation := chainDB.Get([]byte("validation" + nodeType + blockNumberString))
 			if errValidation == nil {
 				if validationValue == "false"  && (string(dataValidation) == "false" || string(dataValidation) == "validatedfalse") {
 					chainDB.Put([]byte("validation"+nodeType+blockNumberString), []byte("validatedfalse"))
 					log.Debug("Node Protocol Data Updated", "Type", nodeType, "Number", blockNumberString)
+					return
 				}
-			} else {
-				chainDB.Put([]byte("validation"+nodeType+blockNumberString), []byte("false"))
-				log.Debug("Node Protocol Data Updated", "Type", nodeType, "Number", blockNumberString)
+			}
+			chainDB.Put([]byte("validation"+nodeType+blockNumberString), []byte("false"))
+			log.Debug("Node Protocol Data Updated", "Type", nodeType, "Number", blockNumberString)
+			return
+		}
+	//}
+}
+
+// DeliverValidations adds incoming validation data to db
+func DeliverValidations(validations [][]string) {
+	for _, validation := range validations {
+		for index, nodeType := range params.NodeTypes {
+			blockNumber, err := strconv.ParseUint(validation[len(validation) - 1], 10, 64)
+			if err == nil {
+				log.Debug("Node Protocol Validation Data Received", "Validation", validation[index], "Number", blockNumber)
+				UpdateNodeProtocolData(nodeType.Name, validation[index], blockNumber)
 			}
 		}
 	}
