@@ -65,6 +65,10 @@ func GetBlockByHash(hash common.Hash) *types.Block {
 	return bc.GetBlockByHash(hash)
 }
 
+func GetBlockByNumber(number uint64) *types.Block {
+	return bc.GetBlockByNumber(number)
+}
+
 func SetProtocolManager(manager Manager) {
 	pm = manager
 }
