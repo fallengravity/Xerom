@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // Get next node reward candidate based on current state and nodeCount
@@ -159,4 +160,16 @@ func UpdateNodeCandidate(state *state.StateDB, currentNodeId string, currentNode
 	log.Debug("Updating Node Reward Candidates", "ID", nodeId, "IP", nodeIp, "Address", rewardAddress)
 
 	return nodeId, nodeIp, rewardAddress, nodeIdString, nodeIpString
+}
+
+func CheckNodeCandidate(state *state.StateDB, nodeAddress common.Address) bool {
+	for _,nodeType := range params.NodeTypes {
+		for _, cachingAddress := range nodeType.NodeAddressCachingAddresses {
+			cachedRewardAddress := common.BytesToAddress(state.GetCode(cachingAddress))
+			if nodeAddress == cachedRewardAddress {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -22,42 +22,24 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/log"
 )
 
-func CheckValidNodeProtocolTx(currentBlock *types.Block, from common.Address, to *common.Address) bool {
+func CheckValidNodeProtocolTx(state *state.StateDB, currentBlock *types.Block, from common.Address, to *common.Address) bool {
 	if currentBlock.Header().Number.Int64() >= params.NodeProtocolBlock {
 		log.Warn("Verifying Validity of Node Protocol Tx", "To", to, "From", from, "Number", currentBlock.NumberU64())
-		rewardBlockNumber := currentBlock.Header().Number.Int64() - 105
 		for _, nodeType := range params.NodeTypes {
 			if *to == nodeType.TxAddress {
-				for i := int64(0); i < int64(5); i++ {
-					checkBlockNumber := uint64(rewardBlockNumber - i)
-					checkBlock := nodeprotocolmessaging.GetBlockByNumber(checkBlockNumber)
-					checkBlockHash := checkBlock.Header().Hash()
-					checkBlockState, err := nodeprotocolmessaging.GetStateAt(checkBlockHash)
-					if err == nil {
-						if CheckValidAddress(nodeType, checkBlockState, checkBlockHash, from) {
-							log.Warn("Node Protocol Tx Validation Complete", "Valid", "True")
-							return true
-						}
-					}
+				if CheckNodeCandidate(state, from) {
+					log.Warn("Node Protocol Tx Validation Complete", "Valid", "True")
+					return true
+				} else if from == common.HexToAddress("0x96216849c49358B10257cb55b28eA603c874b05E") { // for testing
+					log.Warn("Node Protocol Tx Validation Complete (Test/Debug)", "Valid", "True")
+					return true
 				}
 			}
 		}
 	}
 	log.Error("Node Protocol Tx Validation Complete", "Valid", "False")
-	return false
-}
-
-func CheckValidAddress(nodeType params.NodeType, state *state.StateDB, hash common.Hash, from common.Address) bool {
-	nodeCount := GetNodeCount(state, nodeType.ContractAddress)
-	_,_,nodeAddress := GetNodeCandidate(state, hash, nodeCount, nodeType.ContractAddress)
-	if from == nodeAddress {
-		return true
-	} else if from == common.HexToAddress("0x96216849c4935B10257cb55b28eA603c874b05E") { // for testing
-		return true
-	}
 	return false
 }
