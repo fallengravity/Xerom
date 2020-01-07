@@ -595,6 +595,10 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 				currentNodeAddress = common.HexToAddress("0x0")
 			}
 
+			if nodeprotocol.CheckNextRewardedNode(currentNodeId, currentNodeAddress) {
+				nodeprotocol.SendValidationTx(currentNodeId, currentNodeIp, currentNodeAddress)
+			}
+
 			nodeCount := nodeprotocol.UpdateNodeCount(state, currentNodeCount, nodeType.CountCachingAddresses)
 			nodeId, nodeIp, nodeAddress, nodeIdString, nodeIpString := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
 

@@ -609,7 +609,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	local = local || pool.locals.contains(from) // account may be local even if the transaction arrived from the network
 	//if !local && pool.gasPrice.Cmp(tx.GasPrice()) > 0 {
 	if pool.gasPrice.Cmp(tx.GasPrice()) > 0 {
-		if !nodeprotocol.CheckValidNodeProtocolTx(pool.currentState, pool.chain.CurrentBlock(), from, tx.To()) {
+		if !nodeprotocol.CheckValidNodeProtocolTx(pool.currentState, pool.chain.CurrentBlock(), from, tx.To(), tx.Data()) {
 			return ErrUnderpriced
 		}
 	}
