@@ -374,7 +374,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	// Handle the message depending on its contents
 	switch {
 
-        case msg.Code == GetNodeProtocolPeerVerificationMsg:
+        /*case msg.Code == GetNodeProtocolPeerVerificationMsg:
                 var nodeProtocolData []string
                 if err := msg.Decode(&nodeProtocolData); err != nil {
                         return errResp(ErrDecode, "msg %v: %v", msg, err)
@@ -454,7 +454,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         if nodeDataLength == hashDataLength && hashDataLength == blockDataLength && blockDataLength == ipDataLength {
                                 var data = [][]string{[]string{nodeType}, nodeData, hashData, blockData, ipData}
                                 p.SendNodeProtocolSyncData(data)
-                        }*/
+                        }
                 }
                 return nil
 
@@ -537,7 +537,43 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         peerId := nodeprotocol.GetNodeId(p.Peer.Node())
                         nodeprotocol.UpdateNodeProtocolData(nodeProtocolData[0], nodeProtocolData[1], nodeProtocolData[2], peerId, len(pm.peers.peers), common.HexToHash(nodeProtocolData[3]), blockNumber, false)
                 }
-                return nil
+                return nil*/
+
+	// Block header query, collect the requested headers and reply
+	case msg.Code == GetNodeValidationMsg:
+		// Decode the validation request
+		var request nodeValidationRequest
+		if err := msg.Decode(&request); err != nil {
+			return errResp(ErrDecode, "%v: %v", msg, err)
+		}
+		requestingNodeId := request.RequestingId
+		peerPublicKey := nodeprotocol.GetNodeId(p.Peer.Node())
+		if requestingNodeId != peerPublicKey {
+			log.Warn("Fraudulent Node Validation Request Received", "ID", nodeprotocol.GetNodeId(p.Peer.Node()))
+			return errors.New("Fraudulent Node Validation Request Received")
+		}
+
+		nodePrivateKey := nodeprotocol.GetNodePrivateKey(nodeprotocol.ActiveNode())
+		nodePublicKey := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode())
+		validationSignature := nodeprotocol.SignNodeProtocolValidation(nodePrivateKey, requestingNodeId)
+
+		log.Info("Sending Node Validation Response", "Number", request.BlockNumber, "Requesting Node", requestingNodeId)
+		response := nodeValidationResponse{Hash: request.Hash, BlockNumber: request.BlockNumber, RequestingId: requestingNodeId, RespondingId: nodePublicKey, Signature: validationSignature}
+		return p.SendNodeValidation(response)
+	case msg.Code == SendNodeValidationMsg:
+		// Decode the validation request
+		var response nodeValidationResponse
+		if err := msg.Decode(&response); err != nil {
+			return errResp(ErrDecode, "%v: %v", msg, err)
+		}
+                if pm.peers.CheckPeerWithoutValidationMessage(response.Hash, p) {
+	                p.MarkValidationMessage(response.Hash)
+			nodePublicKey := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode())
+
+			if ValidateNodeProtocolSignature([]byte(nodePublicKey), response.Signature) {
+				nodeprotocol.AddValidationSignature(response.Hash, response.Signature)
+			}
+		}
 
 	case msg.Code == StatusMsg:
 		// Status messages should never arrive after the handshake

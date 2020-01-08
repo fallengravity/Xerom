@@ -23,6 +23,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -32,6 +33,9 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 )
+
+var validationMap map[common.Hash][]byte
+var mux = &sync.Mutex{}
 
 type NodeValidations struct {
 	Id          []byte            `json:"id"`
@@ -46,10 +50,6 @@ func CheckNextRewardedNode(nodeId string, address common.Address) bool {
 		return true
 	}
 	return false
-}
-
-func SendValidationTx(nodeId string, nodeIp string, nodeAddress common.Address) {
-
 }
 
 func CheckValidNodeProtocolTx(state *state.StateDB, currentBlock *types.Block, from common.Address, to *common.Address, data []byte) bool {
@@ -97,6 +97,20 @@ func ValidateNodeProtocolSignature(nodeId []byte, signedValidation []byte) bool 
 	fmt.Println("Recovered ID: " + recoveredIdString)
 	fmt.Println("Recovered Address: " + recoveredAddr.String())
 	return false
+}
+
+func AddValidationSignature(hash common.Hash, signedValidation []byte) {
+	mux.Lock()
+	defer mux.Unlock()
+	if validations, ok := validationMap[hash]; ok {
+		validations = append(validations, signedValidation)
+		if len(validations) >= params.MinNodeValidations {
+			SendSignedNodeProtocolTx(GetNodePrivateKey(ActiveNode(), validations)
+			delete(validationMap, hash)
+		} else {
+			validationMap[hash] = validations
+		}
+	}
 }
 
 func SendSignedNodeProtocolTx(privateKey *ecdsa.PrivateKey, validations NodeValidations) *types.Transaction {
