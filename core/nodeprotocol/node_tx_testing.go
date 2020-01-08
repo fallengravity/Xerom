@@ -80,6 +80,6 @@ func txTest() {
 	}
 
 	for _, validation := range v.Validations {
-		ValidateNodeProtocolSignature(idBytes, validation)
+		ValidateNodeProtocolSignature(idBytes, validation, idBytes)
 	}
 }

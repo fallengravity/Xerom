@@ -84,18 +84,22 @@ func SignNodeProtocolValidation(privateKey *ecdsa.PrivateKey, nodeId []byte) []b
 
 // ValidateNodeProtocolSignature is used to verify validation signatures when a node validation tx
 // is recevied to decentrally validate a nodes activity
-func ValidateNodeProtocolSignature(nodeId []byte, signedValidation []byte) bool {
+func ValidateNodeProtocolSignature(nodeId []byte, signedValidation []byte, validationId []byte) bool {
 	recoveredPub, err := crypto.Ecrecover(crypto.Keccak256(nodeId), signedValidation)
 	if err != nil {
 		log.Error("Error", "Error", err)
 	}
 	recoveredId, _ := crypto.UnmarshalPubkey(recoveredPub)
 	recoveredIdString := fmt.Sprintf("%x", crypto.FromECDSAPub(recoveredId)[1:])
-	recoveredAddr := crypto.PubkeyToAddress(*recoveredId)
+	//recoveredAddr := crypto.PubkeyToAddress(*recoveredId)
 
-	log.Info("Recovered Address", "Address", recoveredId)
-	fmt.Println("Recovered ID: " + recoveredIdString)
-	fmt.Println("Recovered Address: " + recoveredAddr.String())
+	//fmt.Println("Recovered ID: " + recoveredIdString)
+	//fmt.Println("Recovered Address: " + recoveredAddr.String())
+	if common.BytesToHash(validationId) == common.BytesToHash([]byte(recoveredIdString)) {
+		log.Info("Node Protocol Signature Validation", "Valid", "True", "Author", recoveredIdString)
+		return true
+	}
+	log.Warn("Node Protocol Signature Validation", "Valid", "False", "Author", recoveredIdString)
 	return false
 }
 

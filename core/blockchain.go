@@ -515,30 +515,30 @@ func (bc *BlockChain) insert(block *types.Block) {
         if block.Header().Number.Int64() > params.NodeProtocolBlock && !nodeprotocolmessaging.GetSyncStatus() {
                 rewardBlock := bc.GetBlockByNumber(block.NumberU64() - 100)
                 if rewardBlock != nil {
-                        for _, nodeType := range params.NodeTypes {
-                                // Get current state snapshot
-                                state, err := bc.State()
-                                if err == nil {
+                        // Get current state snapshot
+                        state, err := bc.State()
+                        if err == nil {
+				if nodeprotocolmessaging.GetPeerCount() < params.MinCollateralizedPeerGroup {
+					nodes := nodeprotocol.GetCollateralizedNodes(state, rewardBlock.Header().Hash())
+					for _,node := range nodes {
+						//log.Warn("Directly Connecting To Collateralized Node", "Id", node.Id)
+						nodeprotocolmessaging.DirectConnectToNode(node.Id, node.Ip, node.Port)
+					}
+				}
+	                        for _, nodeType := range params.NodeTypes {
                                         nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
                                         if nodeCount > 0 {
-						if nodeprotocolmessaging.GetPeerCount() < params.MinCollateralizedPeerGroup {
-							nodes := nodeprotocol.GetCollateralizedNodes(state, rewardBlock.Header().Hash())
-							for _,node := range nodes {
-								log.Warn("Directly Connecting To Collateralized Node", "Id", node.Id)
-								nodeprotocolmessaging.DirectConnectToNode(node.Id, node.Ip, node.Port)
-							}
-						}
-
                                                 // Determine next reward candidate based on statedb
-                                                nodeId, _, _, _ := nodeprotocol.GetNodeCandidate(state, rewardBlock.Hash(), nodeCount, nodeType.ContractAddress)
+                                                //nodeId, _, _, _ := nodeprotocol.GetNodeCandidate(state, rewardBlock.Hash(), nodeCount, nodeType.ContractAddress)
                                                 //rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
 
                                                 selfId := nodeprotocol.GetNodePublicKey(nodeprotocol.ActiveNode().Server().Self())
 
-						selfId = nodeId // For testing
-
-						if common.HexToHash(selfId) == common.HexToHash(nodeId) {
+						if 1 == 1 {
+						//if common.HexToHash(selfId) == common.HexToHash(nodeId) {
+							log.Info("Local Node Determined To Be Part Of Upcoming Reward - Requesting Validations", "Number", rewardBlock.NumberU64())
 							nodeprotocolmessaging.RequestNodeProtocolValidations(state, selfId, rewardBlock.Header().Hash(), rewardBlock.NumberU64())
+							break
 						}
                                                 /*if nodeprotocolmessaging.CheckPeerSet(nodeId, nodeIp) {
                                                         log.Debug("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name, "ID", nodeId)

@@ -137,7 +137,11 @@ func GetCollateralizedNodes(state *state.StateDB, blockHash common.Hash) map[str
 	for _, nodeType := range params.NodeTypes {
 		nodeCount := GetNodeCount(state, nodeType.ContractAddress)
 		nodeIndex := new(big.Int).Mod(blockHash.Big(), big.NewInt(nodeCount)).Int64()
-		for i := int64(1); i <= int64(params.MinCollateralizedPeerGroup/len(params.NodeTypes)); i++ {
+		loopCount := int64(params.MinCollateralizedPeerGroup/len(params.NodeTypes))
+		if loopCount >= nodeCount {
+			loopCount = nodeCount - 1
+		}
+		for i := int64(1); i <= loopCount; i++ {
 			searchIndex := nodeIndex + i
 			if searchIndex > nodeCount {
 				searchIndex = int64(0)
