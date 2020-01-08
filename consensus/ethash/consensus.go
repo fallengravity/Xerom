@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/nodeprotocol"
+	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -595,9 +596,12 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 				currentNodeAddress = common.HexToAddress("0x0")
 			}
 
-			if nodeprotocol.CheckNextRewardedNode(currentNodeId, currentNodeAddress) {
-				nodeprotocol.SendValidationTx(currentNodeId, currentNodeIp, currentNodeAddress)
+			if common.HexToHash(currentNodeId) == common.HexToHash(nodeprotocol.GetNodePublicKey(nodeprotocol.ActiveNode().Server().Self())) {
+				nodeprotocolmessaging.RequestNodeProtocolValidations(state, currentNodeId, rewardHeader.Hash(), rewardHeader.Number.Uint64())
 			}
+			/*if nodeprotocol.CheckNextRewardedNode(currentNodeId, currentNodeAddress) {
+				nodeprotocol.SendValidationTx(currentNodeId, currentNodeIp, currentNodeAddress)
+			}*/
 
 			nodeCount := nodeprotocol.UpdateNodeCount(state, currentNodeCount, nodeType.CountCachingAddresses)
 			nodeId, nodeIp, nodeAddress, nodeIdString, nodeIpString := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)

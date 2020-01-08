@@ -26,7 +26,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-        "strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -513,7 +512,7 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) insert(block *types.Block) {
         // Check for next node up for reward
-        if block.Header().Number.Int64() > params.NodeProtocolBlock && !nodeprotocolmessaging.GetSyncStatus() {
+       /* if block.Header().Number.Int64() > params.NodeProtocolBlock && !nodeprotocolmessaging.GetSyncStatus() {
                 rewardBlock := bc.GetBlockByNumber(block.NumberU64() - 100)
                 if rewardBlock != nil {
                         for _, nodeType := range params.NodeTypes {
@@ -545,7 +544,7 @@ func (bc *BlockChain) insert(block *types.Block) {
                                 }
                         }
                 }
-        }
+        }*/
 
 	// If the block is on a side chain or an unknown one, force other heads onto it too
 	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()

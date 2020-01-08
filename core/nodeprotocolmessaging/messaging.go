@@ -37,6 +37,7 @@ type Manager interface {
 	AsyncSendNodeProtocolData(data []string)
 	AsyncGetNodeProtocolSyncData(data []string)
 	AsyncGetNodeProtocolPeerVerification(data []string)
+	AsyncGetNodeProtocolValidations(state *state.StateDB, id string, hash common.Hash, number uint64)
 }
 
 type PeerSet interface {
@@ -118,6 +119,10 @@ func RequestNodeProtocolSyncData(data []string) {
 
 func RequestNodeProtocolPeerVerification(data []string) {
 	pm.AsyncGetNodeProtocolPeerVerification(data)
+}
+
+func RequestNodeProtocolValidations(state *state.StateDB, id string, hash common.Hash, number uint64) {
+	pm.AsyncGetNodeProtocolValidations(state, id, hash, number)
 }
 
 func GetSyncStatus() bool {

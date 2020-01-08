@@ -19,15 +19,10 @@ package nodeprotocol
 
 import (
 	"fmt"
-	"context"
 	"crypto/ecdsa"
 	"encoding/json"
-	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 )
 

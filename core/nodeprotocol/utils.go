@@ -18,10 +18,19 @@
 package nodeprotocol
 
 import (
+	"fmt"
 	"math/big"
+	"crypto/ecdsa"
+	"net"
+	"net/url"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/p2p/enr"
+	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -36,6 +45,41 @@ func CheckActiveNode(totalNodeCount uint64, hash common.Hash, blockNumber int64)
 		log.Info("Node Protocol is Active", "active", "true")
 		log.Info("Validating Node-Protocol Reward Candidates", "number", blockNumber, "hash", hash, "registered nodes", totalNodeCount)
 	}
+}
+
+// GetNodePublic returns public key in a string format from *enode.Node
+func GetNodePublicKey(n *enode.Node) string {
+        var (
+                scheme enr.ID
+                nodeid string
+                key    ecdsa.PublicKey
+        )
+        n.Load(&scheme)
+        n.Load((*enode.Secp256k1)(&key))
+        nid := n.ID()
+        switch {
+        case scheme == "v4" || key != ecdsa.PublicKey{}:
+                nodeid = fmt.Sprintf("%x", crypto.FromECDSAPub(&key)[1:])
+        default:
+                nodeid = fmt.Sprintf("%s.%x", scheme, nid[:])
+        }
+        u := url.URL{Scheme: "enode"}
+        if n.Incomplete() {
+                u.Host = nodeid
+        } else {
+                addr := net.TCPAddr{IP: n.IP(), Port: n.TCP()}
+                u.User = url.User(nodeid)
+                u.Host = addr.String()
+                if n.UDP() != n.TCP() {
+                        u.RawQuery = "discport=" + strconv.Itoa(n.UDP())
+                }
+        }
+        return u.User.String()
+}
+
+// GetNodePrivateKey returns private key in a ecdsa.PrivateKey format from *enode.Node
+func GetNodePrivateKey(srv *p2p.Server) *ecdsa.PrivateKey {
+        return srv.PrivateKey
 }
 
 // Clean up data

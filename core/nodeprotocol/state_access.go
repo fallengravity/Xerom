@@ -123,6 +123,23 @@ func getNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 	return contractNodeId, contractNodeIp, contractNodeAddress
 }
 
+func GetCollateralizedNodes(state *state.StateDB, blockHash common.Hash) map[string]string {
+	collateralizedNodes := make(map[string]string)
+	for _, nodeType := range params.NodeTypes {
+		nodeCount := GetNodeCount(state, nodeType.ContractAddress)
+		nodeIndex := new(big.Int).Mod(blockHash.Big(), big.NewInt(nodeCount)).Int64()
+		for i := int64(1); i <= int64(10); i++ {
+			searchIndex := nodeIndex + i
+			if searchIndex > nodeCount {
+				searchIndex = int64(0)
+			}
+			id,_,_ := getNodeData(state, getNodeKey(state, searchIndex, nodeType.ContractAddress), nodeType.ContractAddress)
+			collateralizedNodes[id] = id
+		}
+	}
+	return collateralizedNodes
+}
+
 func UpdateNodeCount(state *state.StateDB, currentNodeCount int64, countAddresses []common.Address) uint64 {
 
 	var nodeCount = common.BytesToAddress(state.GetCode(countAddresses[len(countAddresses)-1])).Big().Uint64()

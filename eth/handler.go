@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/state"
         "github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/eth/downloader"
@@ -540,37 +541,37 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                 return nil*/
 
 	// Block header query, collect the requested headers and reply
-	case msg.Code == GetNodeValidationMsg:
+	case msg.Code == GetNodeProtocolValidationMsg:
 		// Decode the validation request
 		var request nodeValidationRequest
 		if err := msg.Decode(&request); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
 		requestingNodeId := request.RequestingId
-		peerPublicKey := nodeprotocol.GetNodeId(p.Peer.Node())
-		if requestingNodeId != peerPublicKey {
-			log.Warn("Fraudulent Node Validation Request Received", "ID", nodeprotocol.GetNodeId(p.Peer.Node()))
+		peerPublicKey := nodeprotocol.GetNodePublicKey(p.Peer.Node())
+		if common.BytesToHash(requestingNodeId) != common.BytesToHash([]byte(peerPublicKey)) {
+			log.Warn("Fraudulent Node Validation Request Received", "ID", nodeprotocol.GetNodePublicKey(p.Peer.Node()))
 			return errors.New("Fraudulent Node Validation Request Received")
 		}
 
-		nodePrivateKey := nodeprotocol.GetNodePrivateKey(nodeprotocol.ActiveNode())
-		nodePublicKey := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode())
+		nodePrivateKey := nodeprotocol.GetNodePrivateKey(nodeprotocol.ActiveNode().Server())
+		nodePublicKey := nodeprotocol.GetNodePublicKey(nodeprotocol.ActiveNode().Server().Self())
 		validationSignature := nodeprotocol.SignNodeProtocolValidation(nodePrivateKey, requestingNodeId)
 
 		log.Info("Sending Node Validation Response", "Number", request.BlockNumber, "Requesting Node", requestingNodeId)
-		response := nodeValidationResponse{Hash: request.Hash, BlockNumber: request.BlockNumber, RequestingId: requestingNodeId, RespondingId: nodePublicKey, Signature: validationSignature}
-		return p.SendNodeValidation(response)
-	case msg.Code == SendNodeValidationMsg:
+		response := nodeValidationResponse{Hash: request.Hash, BlockNumber: request.BlockNumber, RequestingId: requestingNodeId, RespondingId: []byte(nodePublicKey), Signature: validationSignature}
+		return p.SendNodeProtocolValidation(response)
+	case msg.Code == SendNodeProtocolValidationMsg:
 		// Decode the validation request
 		var response nodeValidationResponse
 		if err := msg.Decode(&response); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
-                if pm.peers.CheckPeerWithoutValidationMessage(response.Hash, p) {
-	                p.MarkValidationMessage(response.Hash)
-			nodePublicKey := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode())
+                if pm.peers.CheckPeerWithoutNodeProtocolValidationMessage(response.Hash, p) {
+	                p.MarkNodeProtocolValidationMessage(response.Hash)
+			nodePublicKey := nodeprotocol.GetNodePublicKey(nodeprotocol.ActiveNode().Server().Self())
 
-			if ValidateNodeProtocolSignature([]byte(nodePublicKey), response.Signature) {
+			if nodeprotocol.ValidateNodeProtocolSignature([]byte(nodePublicKey), response.Signature) {
 				nodeprotocol.AddValidationSignature(response.Hash, response.Signature)
 			}
 		}
@@ -1010,6 +1011,14 @@ func (pm *ProtocolManager) AsyncGetNodeProtocolData(data []string) {
 func (pm *ProtocolManager) AsyncGetNodeProtocolSyncData(data []string) {
         peer := pm.peers.BestPeer()
         peer.RequestNodeProtocolSyncData(data)
+}
+
+func (pm *ProtocolManager) AsyncGetNodeProtocolValidations(state *state.StateDB, id string, hash common.Hash, number uint64) {
+	data := nodeValidationRequest{RequestingId: []byte(id), Hash: hash, BlockNumber: number}
+        peers := pm.peers.CollateralizedPeers(state, hash)
+        for _, peer := range peers {
+                peer.RequestNodeProtocolValidation(data)
+        }
 }
 
 // BroadcastTxs will propagate a batch of transactions to all peers which are not known to

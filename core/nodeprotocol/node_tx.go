@@ -34,7 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-var validationMap map[common.Hash][]byte
+var validationMap map[common.Hash][][]byte
 var mux = &sync.Mutex{}
 
 type NodeValidations struct {
@@ -44,7 +44,7 @@ type NodeValidations struct {
 
 func CheckNextRewardedNode(nodeId string, address common.Address) bool {
 	selfNodeKey := ActiveNode().Server().Config.PrivateKey
-	selfNodeId :=  GetNodeId(ActiveNode().Server().Self())
+	selfNodeId :=  GetNodePublicKey(ActiveNode().Server().Self())
 	log.Info("Retrieving Node Key", "Key", selfNodeKey)
 	if nodeId == selfNodeId {
 		return true
@@ -105,7 +105,8 @@ func AddValidationSignature(hash common.Hash, signedValidation []byte) {
 	if validations, ok := validationMap[hash]; ok {
 		validations = append(validations, signedValidation)
 		if len(validations) >= params.MinNodeValidations {
-			SendSignedNodeProtocolTx(GetNodePrivateKey(ActiveNode(), validations)
+			nodeValidations := NodeValidations{Id: []byte(GetNodePublicKey(ActiveNode().Server().Self())), Validations: validations}
+			SendSignedNodeProtocolTx(GetNodePrivateKey(ActiveNode().Server()), nodeValidations)
 			delete(validationMap, hash)
 		} else {
 			validationMap[hash] = validations

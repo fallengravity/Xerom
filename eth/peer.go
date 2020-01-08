@@ -26,6 +26,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/state"
         "github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -44,6 +45,7 @@ const (
         maxKnownNodeData = 1024  // Maximum node data to keep in known list (prevent DOS)
         maxKnownNodeDataMessages = 1024  // Maximum node data message records to keep in known list (prevent DOS)
         maxKnownSendNodePeerVerificationMessages = 1024  // Maximum node data message records to keep in known list (prevent DOS)
+        maxKnownNodeProtocolValidationMessages = 1024  // Maximum node validation message records to keep in known list (prevent DOS)
 
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
@@ -95,6 +97,7 @@ type peer struct {
         knownNodeData                        mapset.Set
         knownNodeDataMessage                 mapset.Set
         knownSendNodePeerVerificationMessage mapset.Set
+        knownNodeProtocolValidationMessage   mapset.Set
 	queuedTxs   chan []*types.Transaction // Queue of transactions to broadcast to the peer
 	queuedProps chan *propEvent           // Queue of blocks to broadcast to the peer
 	queuedAnns  chan *types.Block         // Queue of blocks to announce to the peer
@@ -112,6 +115,7 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
                 knownNodeData:        mapset.NewSet(),
 		knownNodeDataMessage: mapset.NewSet(),
 		knownSendNodePeerVerificationMessage: mapset.NewSet(),
+		knownNodeProtocolValidationMessage:   mapset.NewSet(),
 		queuedTxs:   make(chan []*types.Transaction, maxQueuedTxs),
 		queuedProps: make(chan *propEvent, maxQueuedProps),
 		queuedAnns:  make(chan *types.Block, maxQueuedAnns),
@@ -233,6 +237,15 @@ func (p *peer) MarkSendNodePeerVerification(number string) {
 	p.knownSendNodePeerVerificationMessage.Add(number)
 }
 
+// MarkNodeProtocolValidationMessage marks a validation message as known for the peer
+func (p *peer) MarkNodeProtocolValidationMessage(hash common.Hash) {
+	// If we reached the memory allowance, drop a previously known block hash
+	for p.knownNodeProtocolValidationMessage.Cardinality() >= maxKnownNodeProtocolValidationMessages {
+		p.knownNodeProtocolValidationMessage.Pop()
+	}
+	p.knownNodeProtocolValidationMessage.Add(hash.String())
+}
+
 // SendTransactions sends transactions to the peer and includes the hashes
 // in its transaction hash set for future reference.
 func (p *peer) SendTransactions(txs types.Transactions) error {
@@ -329,6 +342,11 @@ func (p *peer) SendNodeProtocolPeerVerification(data []string) error {
 	return p2p.Send(p.rw, SendNodeProtocolPeerVerificationMsg, data)
 }
 
+// SendNodeProtocolValidation sends signed validation of node activity
+func (p *peer) SendNodeProtocolValidation(data nodeValidationResponse) error {
+	return p2p.Send(p.rw, SendNodeProtocolValidationMsg, data)
+}
+
 // SendNodeDataRLP sends a batch of arbitrary internal data, corresponding to the
 // hashes requested.
 func (p *peer) SendNodeData(data [][]byte) error {
@@ -389,6 +407,11 @@ func (p *peer) RequestNodeProtocolSyncData(data []string) error {
 func (p *peer) RequestNodeProtocolPeerVerification(data []string) error {
 	//p.Log().Debug("Requesting Node Protocol Peer Verification", "Type", data[0], "Hash", data[1], "Number", data[2], "Peer", data[3])
 	return p2p.Send(p.rw, GetNodeProtocolPeerVerificationMsg, data)
+}
+
+// RequestNodeProtocolPeerValidation requests a signed validation from a specific peer
+func (p *peer) RequestNodeProtocolValidation(data nodeValidationRequest) error {
+	return p2p.Send(p.rw, GetNodeProtocolValidationMsg, data)
 }
 
 // RequestNodeData fetches a batch of arbitrary data from a node's known state
@@ -545,7 +568,7 @@ func (ps *peerSet) Len() int {
 func (ps *peerSet) String() []string {
         var peerList []string
         for _, peer := range ps.Peers() {
-                peerList = append(peerList, nodeprotocol.GetNodeId(peer.Node()))
+                peerList = append(peerList, nodeprotocol.GetNodePublicKey(peer.Node()))
         }
         return peerList
 }
@@ -556,7 +579,7 @@ func (ps *peerSet) Ips() map[string]string {
         ipMap = make(map[string]string)
 
         for _, peer := range ps.Peers() {
-                peerId := nodeprotocol.GetNodeId(peer.Node())
+                peerId := nodeprotocol.GetNodePublicKey(peer.Node())
                 peerIp := peer.Node().IP().String()
                 ipMap[peerId] = peerIp
         }
@@ -635,6 +658,23 @@ func (ps *peerSet) PeersWithoutSendNodePeerVerification(number string) []*peer {
 	return list
 }
 
+// CollateralizedPeers retrieves a list of peers from peerset that are collateralized
+func (ps *peerSet) CollateralizedPeers(state *state.StateDB, hash common.Hash) []*peer {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	nodes := nodeprotocol.GetCollateralizedNodes(state, hash)
+
+	list := make([]*peer, 0, len(ps.peers))
+	for _, p := range ps.peers {
+                peerId := nodeprotocol.GetNodePublicKey(p.Node())
+		if _, ok := nodes[peerId]; ok {
+			list = append(list, p)
+		}
+	}
+	return list
+}
+
 // CheckPeerWithoutNodeDataMessage retrieves a list of peers that do not have a given NodeData in
 // their set of known data.
 func (ps *peerSet) CheckPeerWithoutNodeDataMessage(peerId string, p *peer) bool {
@@ -643,6 +683,18 @@ func (ps *peerSet) CheckPeerWithoutNodeDataMessage(peerId string, p *peer) bool 
 
         hash, _ := p.Head()
         if !p.knownNodeDataMessage.Contains(peerId + hash.String()) {
+			return true
+	}
+	return false
+}
+
+// CheckPeerWithoutNodeProtocolValidationMessage checks if peer has node validation message
+// their set of known data.
+func (ps *peerSet) CheckPeerWithoutNodeProtocolValidationMessage(hash common.Hash, p *peer) bool {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+        if !p.knownNodeProtocolValidationMessage.Contains(hash.String()) {
 			return true
 	}
 	return false
