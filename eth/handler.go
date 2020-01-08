@@ -375,7 +375,8 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	// Handle the message depending on its contents
 	switch {
 
-        /*case msg.Code == GetNodeProtocolPeerVerificationMsg:
+        case msg.Code == GetNodeProtocolPeerVerificationMsg:
+		/*
                 var nodeProtocolData []string
                 if err := msg.Decode(&nodeProtocolData); err != nil {
                         return errResp(ErrDecode, "msg %v: %v", msg, err)
@@ -417,10 +418,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         }
                 } else {
                        log.Error("Incorrectly Formatted GetNodeProtocolPeerVerificationMsg")
-                }
+                }*/
                 return nil
 
 	case msg.Code == SendNodeProtocolPeerVerificationMsg:
+		/*
                 var nodeProtocolData []string
                 if err := msg.Decode(&nodeProtocolData); err != nil {
                         return errResp(ErrDecode, "msg %v: %v", msg, err)
@@ -433,10 +435,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         pm.AsyncSendNodeProtocolPeerVerification(nodeProtocolData)
                 } else {
                         log.Error("Incorrectly Formatted SendNodeProtocolPeerVerificationMsg")
-                }
+                }*/
                 return nil
 
 	case msg.Code == GetNodeProtocolSyncDataMsg:
+		/*
                 var nodeProtocolData []string
                 if err := msg.Decode(&nodeProtocolData); err != nil {
                         return errResp(ErrDecode, "msg %v: %v", msg, err)
@@ -456,10 +459,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                                 var data = [][]string{[]string{nodeType}, nodeData, hashData, blockData, ipData}
                                 p.SendNodeProtocolSyncData(data)
                         }
-                }
+                }*/
                 return nil
 
 	case msg.Code == SendNodeProtocolSyncDataMsg:
+		/*
                 var nodeProtocolData [][]string
                 if err := msg.Decode(&nodeProtocolData); err != nil {
                         return errResp(ErrDecode, "msg %v: %v", msg, err)
@@ -490,11 +494,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                                 }
                                 nodeprotocol.SyncNodeProtocolDataGroup(nodeTypeData[0], nodeDataMap, nodeprotocol.GetNodeId(p.Node()), len(pm.peers.peers))
                         }
-                }
+                }*/
                 return nil
 
 	case msg.Code == GetNodeProtocolDataMsg:
-
+		/*
                 var nodeProtocolData []string
 		if err := msg.Decode(&nodeProtocolData); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
@@ -513,11 +517,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         }
                 } else {
                         log.Error("Incorrectly Formatted Node Protocol Data Request")
-                }
+                }*/
                 return nil
 
         case msg.Code == SendNodeProtocolDataMsg:
-
+		/*
                 var nodeProtocolData []string
 		if err := msg.Decode(&nodeProtocolData); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
@@ -537,11 +541,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                         }
                         peerId := nodeprotocol.GetNodeId(p.Peer.Node())
                         nodeprotocol.UpdateNodeProtocolData(nodeProtocolData[0], nodeProtocolData[1], nodeProtocolData[2], peerId, len(pm.peers.peers), common.HexToHash(nodeProtocolData[3]), blockNumber, false)
-                }
-                return nil*/
+                }*/
+                return nil
 
 	// Block header query, collect the requested headers and reply
-	case msg.Code == GetNodeProtocolValidationMsg:
+	case p.version >= etho64 && msg.Code == GetNodeProtocolValidationMsg:
 		// Decode the validation request
 		var request nodeValidationRequest
 		if err := msg.Decode(&request); err != nil {
@@ -558,10 +562,10 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		nodePublicKey := nodeprotocol.GetNodePublicKey(nodeprotocol.ActiveNode().Server().Self())
 		validationSignature := nodeprotocol.SignNodeProtocolValidation(nodePrivateKey, requestingNodeId)
 
-		log.Info("Sending Node Validation Response", "Number", request.BlockNumber, "Requesting Node", requestingNodeId)
+		log.Info("Sending Node Validation Response", "Number", request.BlockNumber, "Requesting Node", requestingNodeId, "Response Signature", validationSignature)
 		response := nodeValidationResponse{Hash: request.Hash, BlockNumber: request.BlockNumber, RequestingId: requestingNodeId, RespondingId: []byte(nodePublicKey), Signature: validationSignature}
 		return p.SendNodeProtocolValidation(response)
-	case msg.Code == SendNodeProtocolValidationMsg:
+	case p.version >= etho64 && msg.Code == SendNodeProtocolValidationMsg:
 		// Decode the validation request
 		var response nodeValidationResponse
 		if err := msg.Decode(&response); err != nil {
@@ -572,9 +576,12 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			nodePublicKey := nodeprotocol.GetNodePublicKey(nodeprotocol.ActiveNode().Server().Self())
 
 			if nodeprotocol.ValidateNodeProtocolSignature([]byte(nodePublicKey), response.Signature) {
+				log.Info("Validated Node Protocol Signature Received", "Number", response.BlockNumber, "Requesting Node", string(response.RequestingId), "Responding Node", string(response.RespondingId), "Response Signature", response.Signature)
 				nodeprotocol.AddValidationSignature(response.Hash, response.Signature)
 			}
+			log.Warn("Invalid Node Protocol Signature Received", "Number", response.BlockNumber, "Requesting Node", string(response.RequestingId), "Responding Node", string(response.RespondingId), "Response Signature", response.Signature)
 		}
+		return nil
 
 	case msg.Code == StatusMsg:
 		// Status messages should never arrive after the handshake
@@ -1016,6 +1023,7 @@ func (pm *ProtocolManager) AsyncGetNodeProtocolSyncData(data []string) {
 func (pm *ProtocolManager) AsyncGetNodeProtocolValidations(state *state.StateDB, id string, hash common.Hash, number uint64) {
 	data := nodeValidationRequest{RequestingId: []byte(id), Hash: hash, BlockNumber: number}
         peers := pm.peers.CollateralizedPeers(state, hash)
+	log.Warn("Collateralized Peer List Received", "Eligible Peers", len(peers))
         for _, peer := range peers {
                 peer.RequestNodeProtocolValidation(data)
         }

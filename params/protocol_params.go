@@ -95,5 +95,6 @@ var (
 	PenaltySystemBlock     = int64(5000)              // Activatation height of Penalty System.
 	DelayedBlockLength     = uint64(20)               // Threshold number of blocks that can be delayed.
 	NodeProtocolBlock      = int64(300000)            // Activatation height of Node-Protocol System.
-	MinNodeValidations     = int(5)                // Minimum number of collateralized nodes required to constitute a fully validated node
+	MinNodeValidations     = int(5)                   // Minimum number of collateralized nodes required to constitute a fully validated node
+	MinCollateralizedPeerGroup = int(50)              // Minimum number of collateralized nodes used in direct connection to build a peer group
 )

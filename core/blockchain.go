@@ -512,7 +512,7 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) insert(block *types.Block) {
         // Check for next node up for reward
-       /* if block.Header().Number.Int64() > params.NodeProtocolBlock && !nodeprotocolmessaging.GetSyncStatus() {
+        if block.Header().Number.Int64() > params.NodeProtocolBlock && !nodeprotocolmessaging.GetSyncStatus() {
                 rewardBlock := bc.GetBlockByNumber(block.NumberU64() - 100)
                 if rewardBlock != nil {
                         for _, nodeType := range params.NodeTypes {
@@ -521,13 +521,26 @@ func (bc *BlockChain) insert(block *types.Block) {
                                 if err == nil {
                                         nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
                                         if nodeCount > 0 {
+						if nodeprotocolmessaging.GetPeerCount() < params.MinCollateralizedPeerGroup {
+							nodes := nodeprotocol.GetCollateralizedNodes(state, rewardBlock.Header().Hash())
+							for _,node := range nodes {
+								log.Warn("Directly Connecting To Collateralized Node", "Id", node.Id)
+								nodeprotocolmessaging.DirectConnectToNode(node.Id, node.Ip, node.Port)
+							}
+						}
+
                                                 // Determine next reward candidate based on statedb
-                                                nodeId, nodeIp, _ := nodeprotocol.GetNodeCandidate(state, rewardBlock.Hash(), nodeCount, nodeType.ContractAddress)
-                                                rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
+                                                nodeId, _, _, _ := nodeprotocol.GetNodeCandidate(state, rewardBlock.Hash(), nodeCount, nodeType.ContractAddress)
+                                                //rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
 
-                                                selfId := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode().Server().Self())
+                                                selfId := nodeprotocol.GetNodePublicKey(nodeprotocol.ActiveNode().Server().Self())
 
-                                                if nodeprotocolmessaging.CheckPeerSet(nodeId, nodeIp) {
+						selfId = nodeId // For testing
+
+						if common.HexToHash(selfId) == common.HexToHash(nodeId) {
+							nodeprotocolmessaging.RequestNodeProtocolValidations(state, selfId, rewardBlock.Header().Hash(), rewardBlock.NumberU64())
+						}
+                                                /*if nodeprotocolmessaging.CheckPeerSet(nodeId, nodeIp) {
                                                         log.Debug("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name, "ID", nodeId)
                                                         var data = []string{nodeType.Name, nodeId, nodeIp, rewardBlock.Hash().String(), rewardBlockNumber}
                                                         nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, nodeIp, selfId, nodeprotocolmessaging.GetPeerCount(), rewardBlock.Hash(), rewardBlock.NumberU64(), false)
@@ -539,12 +552,12 @@ func (bc *BlockChain) insert(block *types.Block) {
                                                         previousRewardBlockNumber := strconv.FormatUint(previousRewardBlock.NumberU64(), 10)
                                                         var data = []string{nodeType.Name, previousRewardBlock.Hash().String(), previousRewardBlockNumber}
                                                         nodeprotocolmessaging.RequestNodeProtocolData(data)
-                                                }
+                                                }*/
                                         }
                                 }
                         }
                 }
-        }*/
+        }
 
 	// If the block is on a side chain or an unknown one, force other heads onto it too
 	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()

@@ -105,8 +105,8 @@ func AddValidationSignature(hash common.Hash, signedValidation []byte) {
 	if validations, ok := validationMap[hash]; ok {
 		validations = append(validations, signedValidation)
 		if len(validations) >= params.MinNodeValidations {
-			nodeValidations := NodeValidations{Id: []byte(GetNodePublicKey(ActiveNode().Server().Self())), Validations: validations}
-			SendSignedNodeProtocolTx(GetNodePrivateKey(ActiveNode().Server()), nodeValidations)
+			//nodeValidations := NodeValidations{Id: []byte(GetNodePublicKey(ActiveNode().Server().Self())), Validations: validations}
+			//SendSignedNodeProtocolTx(GetNodePrivateKey(ActiveNode().Server()), nodeValidations)
 			delete(validationMap, hash)
 		} else {
 			validationMap[hash] = validations

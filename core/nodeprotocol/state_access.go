@@ -28,8 +28,14 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+type NodeInfo struct {
+	Id   string
+	Ip   string
+	Port string
+}
+
 // Get next node reward candidate based on current state and nodeCount
-func GetNodeCandidate(state *state.StateDB, blockHash common.Hash, nodeCount int64, contractAddress common.Address) (string, string, common.Address) {
+func GetNodeCandidate(state *state.StateDB, blockHash common.Hash, nodeCount int64, contractAddress common.Address) (string, string, string, common.Address) {
 	nodeIndex := new(big.Int).Mod(blockHash.Big(), big.NewInt(nodeCount)).Int64()
 	return getNodeData(state, getNodeKey(state, nodeIndex, contractAddress), contractAddress)
 }
@@ -69,7 +75,7 @@ func getNodeKey(state *state.StateDB, nodeIndex int64, contractAddress common.Ad
 	return nodeAddressString.String()
 }
 
-func getNodeData(state *state.StateDB, nodeAddress string, contractAddress common.Address) (string, string, common.Address) {
+func getNodeData(state *state.StateDB, nodeAddress string, contractAddress common.Address) (string, string, string, common.Address) {
 	solcIndex := int64(0)
 
 	hash := sha3.NewKeccak256()
@@ -106,6 +112,7 @@ func getNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 
 	nodeAddressLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(1)))
 	nodeIpLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(3)))
+	nodePortLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(4)))
 
 	// Get storage state from the db using the hashed data
 	responseNodeId1 := state.GetState(contractAddress, finalNodeIdLocation1)
@@ -114,27 +121,29 @@ func getNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 	responseNodeId4 := state.GetState(contractAddress, finalNodeIdLocation4)
 	responseNodeAddress := state.GetState(contractAddress, nodeAddressLocation)
 	responseNodeIp := state.GetState(contractAddress, nodeIpLocation)
+	responseNodePort := state.GetState(contractAddress, nodePortLocation)
 
 	// Assemble the strings
 	contractNodeId := stripCtlAndExtFromBytes(string(responseNodeId1.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId2.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId3.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId4.Bytes()))
 	contractNodeAddress := common.BytesToAddress(responseNodeAddress.Bytes())
 	contractNodeIp := stripCtlAndExtFromBytes(string(responseNodeIp.Bytes()))
+	contractNodePort := stripCtlAndExtFromBytes(string(responseNodePort.Bytes()))
 
-	return contractNodeId, contractNodeIp, contractNodeAddress
+	return contractNodeId, contractNodeIp, contractNodePort, contractNodeAddress
 }
 
-func GetCollateralizedNodes(state *state.StateDB, blockHash common.Hash) map[string]string {
-	collateralizedNodes := make(map[string]string)
+func GetCollateralizedNodes(state *state.StateDB, blockHash common.Hash) map[string]NodeInfo {
+	collateralizedNodes := make(map[string]NodeInfo)
 	for _, nodeType := range params.NodeTypes {
 		nodeCount := GetNodeCount(state, nodeType.ContractAddress)
 		nodeIndex := new(big.Int).Mod(blockHash.Big(), big.NewInt(nodeCount)).Int64()
-		for i := int64(1); i <= int64(10); i++ {
+		for i := int64(1); i <= int64(params.MinCollateralizedPeerGroup/len(params.NodeTypes)); i++ {
 			searchIndex := nodeIndex + i
 			if searchIndex > nodeCount {
 				searchIndex = int64(0)
 			}
-			id,_,_ := getNodeData(state, getNodeKey(state, searchIndex, nodeType.ContractAddress), nodeType.ContractAddress)
-			collateralizedNodes[id] = id
+			id, ip, port,_ := getNodeData(state, getNodeKey(state, searchIndex, nodeType.ContractAddress), nodeType.ContractAddress)
+			collateralizedNodes[id] = NodeInfo{Id: id, Ip: ip, Port: port}
 		}
 	}
 	return collateralizedNodes

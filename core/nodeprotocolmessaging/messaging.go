@@ -30,6 +30,7 @@ var peerSet PeerSet
 var bc Blockchain
 var SyncWg sync.WaitGroup
 var Syncing bool
+var privateAdminApi PrivateAdminAPI
 
 type Manager interface {
 	SyncStatus() bool
@@ -46,6 +47,10 @@ type PeerSet interface {
 	Ips() map[string]string
 }
 
+type PrivateAdminAPI interface {
+	AddPeer(url string) (bool, error)
+}
+
 type Blockchain interface {
 	StateAt(hash common.Hash) (*state.StateDB, error)
 	Rollback(chain []common.Hash)
@@ -56,6 +61,10 @@ type Blockchain interface {
 
 func SetBlockchain(blockchain Blockchain) {
 	bc = blockchain
+}
+
+func SetPrivateAdminApi(api PrivateAdminAPI) {
+	privateAdminApi = api
 }
 
 func GetStateAt(hash common.Hash) (*state.StateDB, error) {
@@ -76,6 +85,15 @@ func SetProtocolManager(manager Manager) {
 
 func SetPeerSet(ps PeerSet) {
 	peerSet = ps
+}
+
+func AddPeer(url string) {
+	privateAdminApi.AddPeer(url)
+}
+
+func DirectConnectToNode(id string, ip string, port string) {
+	enodeUrl := "enode://" + id + "@" + ip + ":" + port
+	AddPeer(enodeUrl)
 }
 
 func RollBackChain(count uint64) {
