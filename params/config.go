@@ -26,6 +26,8 @@ import (
 var NodeIdArray []string
 var NodeIpArray []string
 
+var NodeValidationAddress = common.HexToAddress("0xdF1Fa89137948338BF3bC96c340b0Ee97C144b23")
+
 // Main node type configuration for node-protocol
 var NodeTypes = []NodeType{
 	NodeType{

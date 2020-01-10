@@ -20,7 +20,6 @@ package nodeprotocol
 import (
 	"fmt"
 	"crypto/ecdsa"
-	"encoding/json"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -68,8 +67,8 @@ func txTest() {
 		validations = append(validations, SignNodeProtocolValidation(nodePrivateKey, idBytes))
 	}
 
-	nodeValidations := NodeValidations{Id: idBytes, Validations:validations}
-	tx := SendSignedNodeProtocolTx(privateKey, nodeValidations)
+	//nodeValidations := NodeValidation{Id: idBytes, Validations:validations}
+	/*tx := SendSignedNodeProtocolTx(privateKey, nodeValidations)
 
 
 	// POS - Validation on DNP tx receipt
@@ -81,5 +80,5 @@ func txTest() {
 
 	for _, validation := range v.Validations {
 		ValidateNodeProtocolSignature(idBytes, validation, idBytes)
-	}
+	}*/
 }

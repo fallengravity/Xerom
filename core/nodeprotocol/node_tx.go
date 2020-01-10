@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"context"
 	"crypto/ecdsa"
-	"encoding/json"
 	"math/big"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -37,7 +37,7 @@ import (
 var validationMap map[common.Hash][][]byte
 var mux = &sync.Mutex{}
 
-type NodeValidations struct {
+type NodeValidation struct {
 	Id          []byte            `json:"id"`
 	Validations [][]byte          `json:"validations"`
 }
@@ -106,66 +106,67 @@ func ValidateNodeProtocolSignature(nodeId []byte, signedValidation []byte, valid
 func AddValidationSignature(hash common.Hash, signedValidation []byte) {
 	mux.Lock()
 	defer mux.Unlock()
+	if len(validationMap) == 0 {
+		validationMap = make(map[common.Hash][][]byte)
+	}
 	if validations, ok := validationMap[hash]; ok {
 		validations = append(validations, signedValidation)
 		if len(validations) >= params.MinNodeValidations {
-			//nodeValidations := NodeValidations{Id: []byte(GetNodePublicKey(ActiveNode().Server().Self())), Validations: validations}
-			//SendSignedNodeProtocolTx(GetNodePrivateKey(ActiveNode().Server()), nodeValidations)
+			nodeValidations := NodeValidation{Id: []byte(GetNodePublicKey(ActiveNode().Server().Self())), Validations: validations}
+			SendSignedNodeProtocolTx(GetNodePrivateKey(ActiveNode().Server()), nodeValidations)
 			delete(validationMap, hash)
 		} else {
 			validationMap[hash] = validations
 		}
+	} else {
+		var validations [][]byte
+		validations = append(validations, signedValidation)
+		validationMap[hash] = validations
 	}
 }
 
-func SendSignedNodeProtocolTx(privateKey *ecdsa.PrivateKey, validations NodeValidations) *types.Transaction {
+func SendSignedNodeProtocolTx(privateKey *ecdsa.PrivateKey, validations NodeValidation) {
 	client, err := ethclient.Dial("/home/nucleos/.xerom/geth.ipc")
 	if err != nil {
 		log.Error("Error", "Error", err)
+		return
 	}
 
 	publicKey := privateKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
 		log.Error("Error", "Error", "cannot assert type: publicKey is not of type *ecdsa.PublicKey")
+		return
 	}
 
 	from := crypto.PubkeyToAddress(*publicKeyECDSA)
 	nonce, err := client.PendingNonceAt(context.Background(), from)
 	if err != nil {
 		log.Error("Error", "Error", err)
+		return
 	}
 
-	value := big.NewInt(0)
-	gasLimit := uint64(8000000)
-	gasPrice := big.NewInt(0)
-	to := common.HexToAddress("0x0000000000000000000000000000000000001000")
-	data, err := json.Marshal(validations)
+	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		log.Error("Error", "Error", err)
+		return
 	}
 
-	tx := types.NewTransaction(nonce, to, value, gasLimit, gasPrice, data)
-	chainID, err := client.NetworkID(context.Background())
+	auth := bind.NewKeyedTransactor(privateKey)
+	auth.Nonce = big.NewInt(int64(nonce))
+	auth.GasLimit = uint64(3000000) // in units
+	auth.GasPrice = gasPrice
+
+	instance, err := NewNodeValidations(params.NodeValidationAddress, client)
 	if err != nil {
 		log.Error("Error", "Error", err)
+		return
 	}
 
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
+	tx, err := instance.NodeCheckIn(auth, validations.Validations, validations.Id)
 	if err != nil {
 		log.Error("Error", "Error", err)
+		return
 	}
-
-	//ts := types.Transactions{signedTx}
-	//rawTxBytes := ts.GetRlp(0)
-	//rawTxHex := hex.EncodeToString(rawTxBytes)
-
-	//fmt.Printf(rawTxHex) // f86...772
-
-	err = client.SendTransaction(context.Background(), signedTx)
-	if err != nil {
-		log.Error("Error", "Error", err)
-	}
-	//fmt.Printf("\nTx Sent: %s", signedTx.Hash().Hex())
-	return signedTx
+	log.Info("Node Protocol Validation Tx Sent", "Hash", tx.Hash().Hex())
 }
