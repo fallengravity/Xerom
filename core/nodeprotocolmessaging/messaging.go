@@ -23,14 +23,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 var pm Manager
 var peerSet PeerSet
 var bc Blockchain
 var SyncWg sync.WaitGroup
-var Syncing bool
 var privateAdminApi PrivateAdminAPI
+var publicEthereumApi PublicEthereumAPI
 
 type Manager interface {
 	SyncStatus() bool
@@ -51,6 +52,10 @@ type PrivateAdminAPI interface {
 	AddPeer(url string) (bool, error)
 }
 
+type PublicEthereumAPI interface {
+	Syncing() (interface {}, error)
+}
+
 type Blockchain interface {
 	StateAt(hash common.Hash) (*state.StateDB, error)
 	Rollback(chain []common.Hash)
@@ -65,6 +70,24 @@ func SetBlockchain(blockchain Blockchain) {
 
 func SetPrivateAdminApi(api PrivateAdminAPI) {
 	privateAdminApi = api
+}
+
+func SetPublicEthereumApi(api PublicEthereumAPI) {
+	publicEthereumApi = api
+}
+
+func Syncing() bool {
+	data, err := publicEthereumApi.Syncing()
+	if err == nil {
+		if data == false {
+			log.Debug("Blockchain Sync Status", "Syncing", "False")
+			return false
+		} else {
+			log.Debug("Blockchain Sync Status", "Syncing", "True")
+			return true
+		}
+	}
+	return true
 }
 
 func GetStateAt(hash common.Hash) (*state.StateDB, error) {
@@ -141,11 +164,4 @@ func RequestNodeProtocolPeerVerification(data []string) {
 
 func RequestNodeProtocolValidations(state *state.StateDB, id string, hash common.Hash, number uint64) {
 	pm.AsyncGetNodeProtocolValidations(state, id, hash, number)
-}
-
-func GetSyncStatus() bool {
-	if Syncing {
-		Syncing = pm.SyncStatus()
-	}
-	return Syncing
 }

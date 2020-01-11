@@ -42,7 +42,7 @@ type NodeValidation struct {
 	Validations [][]byte          `json:"validations"`
 }
 
-func CheckNextRewardedNode(nodeId string, address common.Address) bool {
+/*func CheckNextRewardedNode(nodeId string, address common.Address) bool {
 	selfNodeKey := ActiveNode().Server().Config.PrivateKey
 	selfNodeId :=  GetNodePublicKey(ActiveNode().Server().Self())
 	log.Info("Retrieving Node Key", "Key", selfNodeKey)
@@ -50,7 +50,7 @@ func CheckNextRewardedNode(nodeId string, address common.Address) bool {
 		return true
 	}
 	return false
-}
+}*/
 
 func CheckValidNodeProtocolTx(state *state.StateDB, currentBlock *types.Block, from common.Address, to *common.Address, data []byte) bool {
 	if currentBlock.Header().Number.Int64() >= params.NodeProtocolBlock {
@@ -112,8 +112,8 @@ func AddValidationSignature(hash common.Hash, signedValidation []byte) {
 	if validations, ok := validationMap[hash]; ok {
 		validations = append(validations, signedValidation)
 		if len(validations) >= params.MinNodeValidations {
-			nodeValidations := NodeValidation{Id: []byte(GetNodePublicKey(ActiveNode().Server().Self())), Validations: validations}
-			SendSignedNodeProtocolTx(GetNodePrivateKey(ActiveNode().Server()), nodeValidations)
+			//nodeValidations := NodeValidation{Id: []byte(GetNodePublicKey(ActiveNode().Server().Self())), Validations: validations}
+			//SendSignedNodeProtocolTx(GetNodePrivateKey(ActiveNode().Server()), nodeValidations)
 			delete(validationMap, hash)
 		} else {
 			validationMap[hash] = validations

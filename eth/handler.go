@@ -553,19 +553,20 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
 		requestingNodeId := request.RequestingId
-		peerPublicKey := nodeprotocol.GetNodePublicKey(p.Peer.Node())
-		if common.BytesToHash(requestingNodeId) != common.BytesToHash([]byte(peerPublicKey)) {
-			log.Warn("Fraudulent Node Validation Request Received", "Peer ID", []byte(peerPublicKey), "Requesting ID", requestingNodeId)
+		peerEnodeId := nodeprotocol.GetNodeEnodeId(p.Peer.Node())
+		if common.BytesToHash(requestingNodeId) != common.BytesToHash([]byte(peerEnodeId)) {
+			log.Warn("Fraudulent Node Validation Request Received", "Peer ID", []byte(peerEnodeId), "Requesting ID", requestingNodeId)
+			log.Warn("Fraudulent Node Validation Request Received", "Peer ID", peerEnodeId, "Requesting ID", requestingNodeId)
 			return errors.New("Fraudulent Node Validation Request Received")
 		}
 
 		nodePrivateKey := nodeprotocol.GetNodePrivateKey(nodeprotocol.ActiveNode().Server())
-		nodePublicKey := nodeprotocol.GetNodePublicKey(nodeprotocol.ActiveNode().Server().Self())
+		nodeEnodeId := nodeprotocol.GetNodeEnodeId(nodeprotocol.ActiveNode().Server().Self())
 		validationSignature := nodeprotocol.SignNodeProtocolValidation(nodePrivateKey, requestingNodeId)
 
 		//log.Info("Sending Node Validation Response", "Number", request.BlockNumber, "Requesting Node", requestingNodeId, "Response Signature", validationSignature)
-		log.Info("Sending Node Validation Response", "Number", request.BlockNumber, "Requesting Node", peerPublicKey)
-		response := nodeValidationResponse{Hash: request.Hash, BlockNumber: request.BlockNumber, RequestingId: requestingNodeId, RespondingId: []byte(nodePublicKey), Signature: validationSignature}
+		log.Info("Sending Node Validation Response", "Number", request.BlockNumber, "Requesting Node", peerEnodeId)
+		response := nodeValidationResponse{Hash: request.Hash, BlockNumber: request.BlockNumber, RequestingId: requestingNodeId, RespondingId: []byte(nodeEnodeId), Signature: validationSignature}
 		return p.SendNodeProtocolValidation(response)
 	case p.version >= etho64 && msg.Code == SendNodeProtocolValidationMsg:
 		// Decode the validation request
@@ -576,10 +577,10 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
                 if pm.peers.CheckPeerWithoutNodeProtocolValidationMessage(response.Hash, p) {
 	                p.MarkNodeProtocolValidationMessage(response.Hash)
-			nodePublicKey := nodeprotocol.GetNodePublicKey(nodeprotocol.ActiveNode().Server().Self())
-			peerPublicKey := nodeprotocol.GetNodePublicKey(p.Peer.Node())
+			nodeEnodeId := nodeprotocol.GetNodeEnodeId(nodeprotocol.ActiveNode().Server().Self())
+			peerEnodeId := nodeprotocol.GetNodeEnodeId(p.Peer.Node())
 
-			if nodeprotocol.ValidateNodeProtocolSignature([]byte(nodePublicKey), response.Signature, []byte(peerPublicKey)) {
+			if nodeprotocol.ValidateNodeProtocolSignature([]byte(nodeEnodeId), response.Signature, []byte(peerEnodeId)) {
 				//log.Info("Validated Node Protocol Signature Received", "Number", response.BlockNumber, "Requesting Node", string(response.RequestingId), "Responding Node", string(response.RespondingId), "Response Signature", response.Signature)
 				nodeprotocol.AddValidationSignature(response.Hash, response.Signature)
 			} else {
@@ -1025,15 +1026,15 @@ func (pm *ProtocolManager) AsyncGetNodeProtocolSyncData(data []string) {
         peer.RequestNodeProtocolSyncData(data)
 }
 
-func (pm *ProtocolManager) AsyncGetNodeProtocolValidations(state *state.StateDB, id string, hash common.Hash, number uint64) {
-	data := nodeValidationRequest{RequestingId: []byte(id), Hash: hash, BlockNumber: number}
+func (pm *ProtocolManager) AsyncGetNodeProtocolValidations(state *state.StateDB, enodeId string, hash common.Hash, number uint64) {
+	data := nodeValidationRequest{RequestingId: []byte(enodeId), Hash: hash, BlockNumber: number}
         //peers := pm.peers.CollateralizedPeers(state, hash)
 	peers := pm.peers.peers // Use all peers for testing
 	log.Info("Collateralized Peer List Received", "Eligible Peers", len(peers))
         for _, peer := range peers {
 		if peer.version >= etho64 {
-			peerPublicKey := nodeprotocol.GetNodePublicKey(peer.Peer.Node())
-			log.Info("Requesting Node Protocol Validation", "Peer", peerPublicKey)
+			peerEnodeId := nodeprotocol.GetNodeEnodeId(peer.Peer.Node())
+			log.Info("Requesting Node Protocol Validation", "Peer", peerEnodeId)
 	                peer.RequestNodeProtocolValidation(data)
 		}
         }

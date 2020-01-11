@@ -47,7 +47,7 @@ func CheckActiveNode(totalNodeCount uint64, hash common.Hash, blockNumber int64)
 	}
 }
 
-// GetNodePublic returns public key in a string format from *enode.Node
+// GetNodePublicKey returns public key in a string format from *enode.Node
 func GetNodePublicKey(n *enode.Node) string {
         var (
                 scheme enr.ID
@@ -75,6 +75,38 @@ func GetNodePublicKey(n *enode.Node) string {
                 }
         }
         return u.User.String()
+}
+
+// GetNodeEnodeId returns public key in a string format from *enode.Node
+func GetNodeEnodeId(n *enode.Node) string {
+        var (
+                scheme enr.ID
+                nodeid string
+                key    ecdsa.PublicKey
+        )
+        n.Load(&scheme)
+        n.Load((*enode.Secp256k1)(&key))
+        nid := n.ID()
+        switch {
+        case scheme == "v4" || key != ecdsa.PublicKey{}:
+                nodeid = fmt.Sprintf("%x", crypto.FromECDSAPub(&key)[1:])
+        default:
+                nodeid = fmt.Sprintf("%s.%x", scheme, nid[:])
+        }
+        u := url.URL{Scheme: "enode"}
+        if n.Incomplete() {
+                u.Host = nodeid
+        } else {
+                addr := net.TCPAddr{IP: n.IP(), Port: n.UDP()}
+                u.User = url.User(nodeid)
+                u.Host = addr.String()
+                if n.UDP() != n.TCP() {
+                        u.RawQuery = "discport=" + strconv.Itoa(n.UDP())
+                }
+        }
+	log.Error("Enode ID", "ID", u.User.String(), "IP", n.IP().String(), "Port", strconv.Itoa(n.UDP()), "Host", u.Host)
+        return u.String()
+        //return nodeid
 }
 
 // GetNodePrivateKey returns private key in a ecdsa.PrivateKey format from *enode.Node

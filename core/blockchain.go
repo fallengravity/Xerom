@@ -512,7 +512,8 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) insert(block *types.Block) {
         // Check for next node up for reward
-        if block.Header().Number.Int64() > params.NodeProtocolBlock && !nodeprotocolmessaging.GetSyncStatus() {
+        //if block.Header().Number.Int64() > params.NodeProtocolBlock && !nodeprotocolmessaging.GetSyncStatus() {
+        if block.Header().Number.Int64() > params.NodeProtocolBlock && !nodeprotocolmessaging.Syncing() {
                 rewardBlock := bc.GetBlockByNumber(block.NumberU64() - 100)
                 if rewardBlock != nil {
                         // Get current state snapshot
@@ -532,12 +533,13 @@ func (bc *BlockChain) insert(block *types.Block) {
                                                 //nodeId, _, _, _ := nodeprotocol.GetNodeCandidate(state, rewardBlock.Hash(), nodeCount, nodeType.ContractAddress)
                                                 //rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
 
-                                                selfId := nodeprotocol.GetNodePublicKey(nodeprotocol.ActiveNode().Server().Self())
+                                                //selfId := nodeprotocol.GetNodePublicKey(nodeprotocol.ActiveNode().Server().Self())
+                                                selfEnodeId := nodeprotocol.GetNodeEnodeId(nodeprotocol.ActiveNode().Server().Self())
 
 						if 1 == 1 {
 						//if common.HexToHash(selfId) == common.HexToHash(nodeId) {
 							log.Info("Local Node Determined To Be Part Of Upcoming Reward - Requesting Validations", "Number", rewardBlock.NumberU64())
-							nodeprotocolmessaging.RequestNodeProtocolValidations(state, selfId, rewardBlock.Header().Hash(), rewardBlock.NumberU64())
+							nodeprotocolmessaging.RequestNodeProtocolValidations(state, selfEnodeId, rewardBlock.Header().Hash(), rewardBlock.NumberU64())
 							break
 						}
                                                 /*if nodeprotocolmessaging.CheckPeerSet(nodeId, nodeIp) {
