@@ -578,9 +578,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                 if pm.peers.CheckPeerWithoutNodeProtocolValidationMessage(response.Hash, p) {
 	                p.MarkNodeProtocolValidationMessage(response.Hash)
 			nodeEnodeId := nodeprotocol.GetNodeEnodeId(nodeprotocol.ActiveNode().Server().Self())
-			peerEnodeId := nodeprotocol.GetNodeEnodeId(p.Peer.Node())
+			peerPublicKey := nodeprotocol.GetNodePublicKey(p.Peer.Node())
 
-			if nodeprotocol.ValidateNodeProtocolSignature([]byte(nodeEnodeId), response.Signature, []byte(peerEnodeId)) {
+			if nodeprotocol.ValidateNodeProtocolSignature([]byte(nodeEnodeId), response.Signature, []byte(peerPublicKey)) {
 				//log.Info("Validated Node Protocol Signature Received", "Number", response.BlockNumber, "Requesting Node", string(response.RequestingId), "Responding Node", string(response.RespondingId), "Response Signature", response.Signature)
 				nodeprotocol.AddValidationSignature(response.Hash, response.Signature)
 			} else {
