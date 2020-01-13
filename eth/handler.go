@@ -560,9 +560,10 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errors.New("Fraudulent Node Validation Request Received")
 		}
 
+		requestingHash := request.Hash
 		nodePrivateKey := nodeprotocol.GetNodePrivateKey(nodeprotocol.ActiveNode().Server())
 		nodeEnodeId := nodeprotocol.GetNodeEnodeId(nodeprotocol.ActiveNode().Server().Self())
-		validationSignature := nodeprotocol.SignNodeProtocolValidation(nodePrivateKey, requestingNodeId)
+		validationSignature := nodeprotocol.SignNodeProtocolValidation(nodePrivateKey, requestingNodeId, requestingHash)
 
 		//log.Info("Sending Node Validation Response", "Number", request.BlockNumber, "Requesting Node", requestingNodeId, "Response Signature", validationSignature)
 		log.Info("Sending Node Validation Response", "Number", request.BlockNumber, "Requesting Node", peerEnodeId)
@@ -580,7 +581,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			nodeEnodeId := nodeprotocol.GetNodeEnodeId(nodeprotocol.ActiveNode().Server().Self())
 			peerPublicKey := nodeprotocol.GetNodePublicKey(p.Peer.Node())
 
-			if nodeprotocol.ValidateNodeProtocolSignature([]byte(nodeEnodeId), response.Signature, []byte(peerPublicKey)) {
+			if nodeprotocol.ValidateNodeProtocolSignature([]byte(nodeEnodeId), response.Signature, []byte(peerPublicKey), response.Hash) {
 				//log.Info("Validated Node Protocol Signature Received", "Number", response.BlockNumber, "Requesting Node", string(response.RequestingId), "Responding Node", string(response.RespondingId), "Response Signature", response.Signature)
 				nodeprotocol.AddValidationSignature(response.Hash, response.Signature)
 			} else {

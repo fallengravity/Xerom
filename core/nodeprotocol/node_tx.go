@@ -21,15 +21,17 @@ import (
 	"fmt"
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"math/big"
 	"sync"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -42,36 +44,11 @@ type NodeValidation struct {
 	Validations [][]byte          `json:"validations"`
 }
 
-/*func CheckNextRewardedNode(nodeId string, address common.Address) bool {
-	selfNodeKey := ActiveNode().Server().Config.PrivateKey
-	selfNodeId :=  GetNodePublicKey(ActiveNode().Server().Self())
-	log.Info("Retrieving Node Key", "Key", selfNodeKey)
-	if nodeId == selfNodeId {
-		return true
+func CheckValidNodeProtocolTx(address common.Address, input []byte) bool {
+	if address != params.NodeValidationAddress {
+		return false
 	}
-	return false
-}*/
 
-/*func CheckValidNodeProtocolTx(state *state.StateDB, currentBlock *types.Block, from common.Address, to *common.Address, data []byte) bool {
-	if currentBlock.Header().Number.Int64() >= params.NodeProtocolBlock {
-		log.Warn("Verifying Validity of Node Protocol Tx", "To", to, "From", from, "Number", currentBlock.NumberU64())
-		for _, nodeType := range params.NodeTypes {
-			if *to == nodeType.TxAddress {
-				/*if CheckNodeCandidate(state, from) {
-					log.Warn("Node Protocol Tx Validation Complete", "Valid", "True")
-					return true*/
-				if from == common.HexToAddress("0x96216849c49358B10257cb55b28eA603c874b05E") { // for testing
-/*					log.Warn("Node Protocol Tx Validation Complete (Test/Debug)", "Valid", "True")
-					return true
-				}
-			}
-		}
-	}
-	log.Error("Node Protocol Tx Validation Complete", "Valid", "False")
-	return false
-}*/
-
-func CheckValidNodeProtocolTx(input []byte) bool {
 	abi, err := abi.JSON(strings.NewReader(NodeValidationsABI))
 	if err != nil {
 		log.Error("Invalid Node Protocol Tx Detected", "Error", err)
@@ -79,7 +56,7 @@ func CheckValidNodeProtocolTx(input []byte) bool {
 	}
 
 	// Decode tx input method signature
-	decodedSig, err := hex.DecodeString(input[2:10])
+	decodedSig, err := hex.DecodeString(hex.EncodeToString(input)[2:10])
 	if err != nil {
 		log.Error("Invalid Node Protocol Tx Detected", "Error", err)
 		return false
@@ -93,7 +70,7 @@ func CheckValidNodeProtocolTx(input []byte) bool {
 	}
 
 	// Decode tx input payload
-	decodedData, err := hex.DecodeString(input[10:])
+	decodedData, err := hex.DecodeString(hex.EncodeToString(input)[10:])
 	if err != nil {
 		log.Error("Invalid Node Protocol Tx Detected", "Error", err)
 		return false
@@ -113,15 +90,21 @@ func CheckValidNodeProtocolTx(input []byte) bool {
 		return false
 	}
 
-	return ValidateNodeProtocolSignatureByHash(data.Id, data.Validations, data.Hash)
-
+	for _, sig := range data.Validations {
+		if !ValidateNodeProtocolSignatureByHash(data.Id, sig, data.Hash) {
+			return false
+		}
+	}
+	return true
 }
 
 
 // SignNodeProtocolValidation is used to respond to a peer/next node's validation request
 // A signed validation using enode private key signals an unequivocal validation of activity
 func SignNodeProtocolValidation(privateKey *ecdsa.PrivateKey, data []byte, blockHash common.Hash) []byte {
-	hash := crypto.Keccak256(data + []byte(":") + blokcHash.Bytes())
+	data = append(data, ":"...)
+	data = append(data, blockHash.String()...)
+	hash := crypto.Keccak256(data)
         signedValidation, err := crypto.Sign(hash, privateKey)
         if err != nil {
 		log.Error("Error", "Error", err)
@@ -147,7 +130,7 @@ func ValidateNodeProtocolSignatureByHash(nodeId []byte, signedValidation []byte,
 
 	collateralizedPeerGroup := GetCollateralizedHashedGroup(state, hash)
 
-	if _, ok := validationMap[common.BytesToHash([]byte(recoveredIdString)]; ok {
+	if _, ok := collateralizedPeerGroup[common.BytesToHash([]byte(recoveredIdString))]; ok {
 		log.Info("Node Protocol Signature Validation", "Valid", "True", "Author", recoveredIdString)
 		return true
 	}
@@ -158,16 +141,15 @@ func ValidateNodeProtocolSignatureByHash(nodeId []byte, signedValidation []byte,
 // ValidateNodeProtocolSignature is used to verify validation signatures when a node validation tx
 // is recevied to decentrally validate a nodes activity
 func ValidateNodeProtocolSignature(nodeId []byte, signedValidation []byte, validationId []byte, blockHash common.Hash) bool {
-	recoveredPub, err := crypto.Ecrecover(crypto.Keccak256(nodeId + []byte(":") + blockHash.Bytes()), signedValidation)
+	nodeId = append(nodeId, ":"...)
+	nodeId = append(nodeId, blockHash.String()...)
+	recoveredPub, err := crypto.Ecrecover(crypto.Keccak256(nodeId), signedValidation)
 	if err != nil {
 		log.Error("Error", "Error", err)
 	}
 	recoveredId, _ := crypto.UnmarshalPubkey(recoveredPub)
 	recoveredIdString := fmt.Sprintf("%x", crypto.FromECDSAPub(recoveredId)[1:])
-	//recoveredAddr := crypto.PubkeyToAddress(*recoveredId)
 
-	//fmt.Println("Recovered ID: " + recoveredIdString)
-	//fmt.Println("Recovered Address: " + recoveredAddr.String())
 	if common.BytesToHash(validationId) == common.BytesToHash([]byte(recoveredIdString)) {
 		log.Info("Node Protocol Signature Validation", "Valid", "True", "Author", recoveredIdString)
 		return true
@@ -185,8 +167,8 @@ func AddValidationSignature(hash common.Hash, signedValidation []byte) {
 	if validations, ok := validationMap[hash]; ok {
 		validations = append(validations, signedValidation)
 		if len(validations) >= params.MinNodeValidations {
-			//nodeValidations := NodeValidation{Id: []byte(GetNodePublicKey(ActiveNode().Server().Self())), Validations: validations}
-			//SendSignedNodeProtocolTx(GetNodePrivateKey(ActiveNode().Server()), nodeValidations)
+			nodeValidations := NodeValidation{Id: []byte(GetNodePublicKey(ActiveNode().Server().Self())), Validations: validations}
+			SendSignedNodeProtocolTx(GetNodePrivateKey(ActiveNode().Server()), nodeValidations)
 			delete(validationMap, hash)
 		} else {
 			validationMap[hash] = validations
@@ -199,7 +181,7 @@ func AddValidationSignature(hash common.Hash, signedValidation []byte) {
 }
 
 func SendSignedNodeProtocolTx(privateKey *ecdsa.PrivateKey, validations NodeValidation) {
-	client, err := ethclient.Dial("/home/nucleos/.xerom/geth.ipc")
+	client, err := ethclient.Dial(ActiveNode().IPCEndpoint())
 	if err != nil {
 		log.Error("Error", "Error", err)
 		return

@@ -104,9 +104,7 @@ func GetNodeEnodeId(n *enode.Node) string {
                         u.RawQuery = "discport=" + strconv.Itoa(n.UDP())
                 }
         }
-	//log.Error("Enode ID", "ID", u.User.String(), "IP", n.IP().String(), "Port", n.UDP(), "Host", u.Host, "TCP Port", n.TCP())
         return u.User.String() + ":" + n.IP().String()
-        //return nodeid
 }
 
 // GetNodePrivateKey returns private key in a ecdsa.PrivateKey format from *enode.Node

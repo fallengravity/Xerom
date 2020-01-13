@@ -18,18 +18,18 @@
 package nodeprotocol
 
 import (
-	"fmt"
-	"crypto/ecdsa"
+//	"fmt"
+//	"crypto/ecdsa"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
+//	"github.com/ethereum/go-ethereum/crypto"
+//	"github.com/ethereum/go-ethereum/log"
 )
 
 var id = "ba7e67b457e0c746bed770300a3fef89c24f77cf467acda9131f271186b9b81d"
 var keys = []string{"fad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19", "8dbe9fe18ddce807baf17ac41a9246c023a63df6a4fb481182fa0b4958605665", "a3ccdced2c63c721202145402c09d63a3b747dd62e5f47bdc573f5d00bfc1663", "fca0bb13ac202e001d9a11d5bfb62b4e91564774b7bd6a5f69c3cb6a05392050", "19815fea11e6c188f90ca15cb87b85f2a919c641e447f9636830f734f73ee45d"}
 
 func txTest() {
-	var validations [][]byte
+	/*var validations [][]byte
 
 	privateKey, err := crypto.HexToECDSA(id)
 	if err != nil {
@@ -65,7 +65,7 @@ func txTest() {
 
 		// After Validations have been revceived
 		validations = append(validations, SignNodeProtocolValidation(nodePrivateKey, idBytes))
-	}
+	}*/
 
 	//nodeValidations := NodeValidation{Id: idBytes, Validations:validations}
 	/*tx := SendSignedNodeProtocolTx(privateKey, nodeValidations)

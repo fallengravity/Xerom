@@ -744,8 +744,9 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		// Retrieve the next priority transaction and process to normal txs if all done
 		tx := txs.PriorityPeek()
 		if tx == nil {
-			log.Warn("No Priority Txs Found", "Txs", 0)
+			log.Warn("No Priority Txs Found", "Txs", txs.PriorityTxCount())
 		} else {
+			log.Warn("Pending Priority Txs Found", "Txs", txs.PriorityTxCount())
 			// Error may be ignored here. The error has already been checked
 			// during transaction acceptance is the transaction pool.
 			//

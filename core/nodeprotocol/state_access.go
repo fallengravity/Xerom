@@ -168,7 +168,7 @@ func GetCollateralizedHashedGroup(state *state.StateDB, blockHash common.Hash) m
 				searchIndex = int64(0)
 			}
 			id, ip, port,_ := getNodeData(state, getNodeKey(state, searchIndex, nodeType.ContractAddress), nodeType.ContractAddress)
-			collateralizedGroup[common.BytesToHash([]byte(id) + []byte(":") + []byte(ip))] = NodeInfo{Id: id, Ip: ip, Port: port}
+			collateralizedGroup[common.BytesToHash([]byte(id + ":" + ip))] = NodeInfo{Id: id, Ip: ip, Port: port}
 		}
 	}
 	return collateralizedGroup

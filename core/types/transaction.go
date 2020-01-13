@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -338,11 +339,11 @@ func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transa
 	heads := make(TxByPrice, 0, len(txs))
 	var priorityTxs []*Transaction
 	for from, accTxs := range txs {
-		if accTxs[0].To() == params.NodeValidationAddress {
+		if *accTxs[0].To() == params.NodeValidationAddress {
 			priorityTxs = append(priorityTxs, accTxs[0])
-			delete(txs, from)
+		} else {
+			heads = append(heads, accTxs[0])
 		}
-		heads = append(heads, accTxs[0])
 		// Ensure the sender address is from the signer
 		acc, _ := Sender(signer, accTxs[0])
 		txs[acc] = accTxs[1:]
@@ -369,8 +370,13 @@ func (t *TransactionsByPriceAndNonce) Peek() *Transaction {
 	return t.heads[0]
 }
 
+// PriorityTxCount returns the count of pending priority txs.
+func (t *TransactionsByPriceAndNonce) PriorityTxCount() int {
+	return len(t.priorityTxs)
+}
+
 // PeekPriority returns the next priority transaction.
-func (t *TransactionsByPriceAndNonce) PeekPriority() *Transaction {
+func (t *TransactionsByPriceAndNonce) PriorityPeek() *Transaction {
 	if len(t.priorityTxs) == 0 {
 		return nil
 	}
@@ -389,8 +395,13 @@ func (t *TransactionsByPriceAndNonce) Shift() {
 }
 
 // PopPriority removes the most recent priority tx from slice preserving order.
-func (t *TransactionsByPriceAndNonce) PopPriority() {
-	&t.priorityTxs = &t.priorityTxs[1:]
+func (t *TransactionsByPriceAndNonce) PriorityPop() {
+	acc, _ := Sender(t.signer, t.priorityTxs[0])
+	if txs, ok := t.txs[acc]; ok && len(txs) > 0 {
+		t.priorityTxs[0], t.txs[acc] = txs[0], txs[1:]
+	} else {
+		t.priorityTxs = t.priorityTxs[1:]
+	}
 }
 
 // Pop removes the best transaction, *not* replacing it with the next one from
