@@ -9,6 +9,7 @@ contract  NodeValidations {
         address nodeAddress;
         bytes[] signatures;
         uint signatureCount;
+	bytes signatureBlockHash;
         bytes publicKey;
         uint blockHeight;
     }
@@ -16,8 +17,8 @@ contract  NodeValidations {
     constructor() public {
     }
     
-    function nodeCheckIn(bytes[] signatures, bytes publicKey) public {
-        signedNodeValidation memory validation = signedNodeValidation({nodeAddress:tx.origin, signatures:signatures, signatureCount:signatures.length, publicKey:publicKey, blockHeight:block.number});
+    function nodeCheckIn(bytes[] signatures, bytes publicKey, bytes signatureBlockHash) public {
+        signedNodeValidation memory validation = signedNodeValidation({nodeAddress:tx.origin, signatures:signatures, signatureCount:signatures.length, signatureBlockHash:signatureBlockHash, publicKey:publicKey, blockHeight:block.number});
         lastNodeActivity[tx.origin] = validation;
     }
     

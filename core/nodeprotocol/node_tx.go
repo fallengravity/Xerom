@@ -52,7 +52,7 @@ type NodeValidation struct {
 	return false
 }*/
 
-func CheckValidNodeProtocolTx(state *state.StateDB, currentBlock *types.Block, from common.Address, to *common.Address, data []byte) bool {
+/*func CheckValidNodeProtocolTx(state *state.StateDB, currentBlock *types.Block, from common.Address, to *common.Address, data []byte) bool {
 	if currentBlock.Header().Number.Int64() >= params.NodeProtocolBlock {
 		log.Warn("Verifying Validity of Node Protocol Tx", "To", to, "From", from, "Number", currentBlock.NumberU64())
 		for _, nodeType := range params.NodeTypes {
@@ -61,7 +61,7 @@ func CheckValidNodeProtocolTx(state *state.StateDB, currentBlock *types.Block, f
 					log.Warn("Node Protocol Tx Validation Complete", "Valid", "True")
 					return true*/
 				if from == common.HexToAddress("0x96216849c49358B10257cb55b28eA603c874b05E") { // for testing
-					log.Warn("Node Protocol Tx Validation Complete (Test/Debug)", "Valid", "True")
+/*					log.Warn("Node Protocol Tx Validation Complete (Test/Debug)", "Valid", "True")
 					return true
 				}
 			}
@@ -69,12 +69,59 @@ func CheckValidNodeProtocolTx(state *state.StateDB, currentBlock *types.Block, f
 	}
 	log.Error("Node Protocol Tx Validation Complete", "Valid", "False")
 	return false
+}*/
+
+func CheckValidNodeProtocolTx(input []byte) bool {
+	abi, err := abi.JSON(strings.NewReader(NodeValidationsABI))
+	if err != nil {
+		log.Error("Invalid Node Protocol Tx Detected", "Error", err)
+		return false
+	}
+
+	// Decode tx input method signature
+	decodedSig, err := hex.DecodeString(input[2:10])
+	if err != nil {
+		log.Error("Invalid Node Protocol Tx Detected", "Error", err)
+		return false
+	}
+
+	// Recover method from signature and ABI
+	method, err := abi.MethodById(decodedSig)
+	if err != nil {
+		log.Error("Invalid Node Protocol Tx Detected", "Error", err)
+		return false
+	}
+
+	// Decode tx input payload
+	decodedData, err := hex.DecodeString(input[10:])
+	if err != nil {
+		log.Error("Invalid Node Protocol Tx Detected", "Error", err)
+		return false
+	}
+
+	type FunctionInputs struct {
+		Validations [][]byte
+		Id []byte
+		Hash common.Hash
+	}
+
+	var data FunctionInputs
+
+	err = method.Inputs.Unpack(&data, decodedData)
+	if err != nil {
+		log.Error("Invalid Node Protocol Tx Detected", "Error", err)
+		return false
+	}
+
+	return ValidateNodeProtocolSignatureByHash(data.Id, data.Validations, data.Hash)
+
 }
+
 
 // SignNodeProtocolValidation is used to respond to a peer/next node's validation request
 // A signed validation using enode private key signals an unequivocal validation of activity
-func SignNodeProtocolValidation(privateKey *ecdsa.PrivateKey, nodeId []byte) []byte {
-	hash := crypto.Keccak256(nodeId)
+func SignNodeProtocolValidation(privateKey *ecdsa.PrivateKey, data []byte, blockHash common.Hash) []byte {
+	hash := crypto.Keccak256(data + []byte(":") + blokcHash.Bytes())
         signedValidation, err := crypto.Sign(hash, privateKey)
         if err != nil {
 		log.Error("Error", "Error", err)
@@ -82,10 +129,36 @@ func SignNodeProtocolValidation(privateKey *ecdsa.PrivateKey, nodeId []byte) []b
 	return signedValidation
 }
 
+// ValidateNodeProtocolSignatureByHash is used to verify validation signatures of a block when only a block hash
+// is known
+func ValidateNodeProtocolSignatureByHash(nodeId []byte, signedValidation []byte, hash common.Hash) bool {
+	recoveredPub, err := crypto.Ecrecover(crypto.Keccak256(nodeId), signedValidation)
+	if err != nil {
+		log.Error("Error", "Error", err)
+	}
+	recoveredId, _ := crypto.UnmarshalPubkey(recoveredPub)
+	recoveredIdString := fmt.Sprintf("%x", crypto.FromECDSAPub(recoveredId)[1:])
+
+	state, err := nodeprotocolmessaging.GetStateAt(hash)
+	if err != nil {
+		log.Error("Error Retrieving State DB", "Hash", hash)
+		return false
+	}
+
+	collateralizedPeerGroup := GetCollateralizedHashedGroup(state, hash)
+
+	if _, ok := validationMap[common.BytesToHash([]byte(recoveredIdString)]; ok {
+		log.Info("Node Protocol Signature Validation", "Valid", "True", "Author", recoveredIdString)
+		return true
+	}
+	log.Warn("Node Protocol Signature Validation", "Valid", "False", "Author", recoveredIdString)
+	return false
+}
+
 // ValidateNodeProtocolSignature is used to verify validation signatures when a node validation tx
 // is recevied to decentrally validate a nodes activity
-func ValidateNodeProtocolSignature(nodeId []byte, signedValidation []byte, validationId []byte) bool {
-	recoveredPub, err := crypto.Ecrecover(crypto.Keccak256(nodeId), signedValidation)
+func ValidateNodeProtocolSignature(nodeId []byte, signedValidation []byte, validationId []byte, blockHash common.Hash) bool {
+	recoveredPub, err := crypto.Ecrecover(crypto.Keccak256(nodeId + []byte(":") + blockHash.Bytes()), signedValidation)
 	if err != nil {
 		log.Error("Error", "Error", err)
 	}

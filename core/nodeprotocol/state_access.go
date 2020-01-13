@@ -153,6 +153,27 @@ func GetCollateralizedNodes(state *state.StateDB, blockHash common.Hash) map[str
 	return collateralizedNodes
 }
 
+func GetCollateralizedHashedGroup(state *state.StateDB, blockHash common.Hash) map[common.Hash]NodeInfo {
+	collateralizedGroup := make(map[common.Hash]NodeInfo)
+	for _, nodeType := range params.NodeTypes {
+		nodeCount := GetNodeCount(state, nodeType.ContractAddress)
+		nodeIndex := new(big.Int).Mod(blockHash.Big(), big.NewInt(nodeCount)).Int64()
+		loopCount := int64(params.MinCollateralizedPeerGroup/len(params.NodeTypes))
+		if loopCount >= nodeCount {
+			loopCount = nodeCount - 1
+		}
+		for i := int64(1); i <= loopCount; i++ {
+			searchIndex := nodeIndex + i
+			if searchIndex > nodeCount {
+				searchIndex = int64(0)
+			}
+			id, ip, port,_ := getNodeData(state, getNodeKey(state, searchIndex, nodeType.ContractAddress), nodeType.ContractAddress)
+			collateralizedGroup[common.BytesToHash([]byte(id) + []byte(":") + []byte(ip))] = NodeInfo{Id: id, Ip: ip, Port: port}
+		}
+	}
+	return collateralizedGroup
+}
+
 func UpdateNodeCount(state *state.StateDB, currentNodeCount int64, countAddresses []common.Address) uint64 {
 
 	var nodeCount = common.BytesToAddress(state.GetCode(countAddresses[len(countAddresses)-1])).Big().Uint64()
