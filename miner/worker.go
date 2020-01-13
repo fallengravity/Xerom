@@ -740,8 +740,49 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			log.Trace("Not enough gas for further transactions", "have", w.current.gasPool, "want", params.TxGas)
 			break
 		}
+
+		// Retrieve the next priority transaction and process to normal txs if all done
+		tx := txs.PriorityPeek()
+		if tx == nil {
+			log.Warn("No Priority Txs Found", "Txs", 0)
+		} else {
+			// Error may be ignored here. The error has already been checked
+			// during transaction acceptance is the transaction pool.
+			//
+			// We use the eip155 signer regardless of the current hf.
+			from, _ := types.Sender(w.current.signer, tx)
+			// Check whether the tx is replay protected. If we're not in the EIP155 hf
+			// phase, start ignoring the sender until we do.
+			if tx.Protected() && !w.config.IsEIP155(w.current.header.Number) {
+				log.Trace("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", w.config.EIP155Block)
+
+				txs.Pop()
+				continue
+			}
+			// Start executing the transaction
+			w.current.state.Prepare(tx.Hash(), common.Hash{}, w.current.tcount)
+
+			logs, err := w.commitTransaction(tx, coinbase)
+			switch err {
+			case core.ErrGasLimitReached:
+				// If gas limit reached, wait until next block for priority tx
+				log.Trace("Gas limit exceeded for current block", "sender", from)
+
+			case nil:
+				// Everything ok, collect the logs and shift in the next priority transaction in
+				coalescedLogs = append(coalescedLogs, logs...)
+				w.current.tcount++
+				txs.PriorityPop()
+
+			default:
+				// Pop priority tx off of slice in event of error or successful processing
+				log.Trace("Skipping priority transaction with low nonce", "sender", from, "nonce", tx.Nonce())
+				txs.PriorityPop()
+			}
+		}
+
 		// Retrieve the next transaction and abort if all done
-		tx := txs.Peek()
+		tx = txs.Peek()
 		if tx == nil {
 			break
 		}
