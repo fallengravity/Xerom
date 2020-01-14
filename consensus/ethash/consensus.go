@@ -629,7 +629,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 	params.NodeIpArray = nodeIpArray
 
 	// Accumulate any block and uncle rewards and commit the final state root
-	accumulateRewards(chain.Config(), state, header, uncles, nodeAddresses, nodeRemainders)
+	accumulateRewards(chain.Config(), state, header, uncles, txs, nodeAddresses, nodeRemainders)
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Header seems complete, assemble into a block and return
@@ -668,7 +668,7 @@ var (
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header, nodeAddresses []common.Address, nodeRemainders []*big.Int) {
+func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header, txs []*types.Transaction, nodeAddresses []common.Address, nodeRemainders []*big.Int) {
 	var blockReward = minerBlockReward             // Set miner reward base
 	var masternodeReward = masternodeBlockReward   // Set masternode reward
 	var developmentReward = developmentBlockReward // Set development reward
@@ -735,6 +735,17 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 	state.AddBalance(common.HexToAddress("0xB69B9216B5089Dc3881A4E38f691e9B6943DFA11"), developmentReward)
 	// Node Rewards via consensus
 	if header.Number.Int64() > params.NodeProtocolBlock {
+		// Disburse any potential node protocol priority tx rewards here
+		if config.IsPrometheus(header.Number) {
+			priorityTxReward := new(big.Int)
+			priorityTxReward.Div(blockReward, big.NewInt(100))
+			for _, tx := range txs {
+				if nodeprotocol.CheckValidNodeProtocolTx(tx) {
+					// Reward miner for mining priority node validation txs
+					state.AddBalance(header.Coinbase, priorityTxReward)
+				}
+			}
+		}
 		if len(nodeAddresses) == len(params.NodeTypes) {
 			// Iterate over node types to disburse node rewards and calculated remainders
 			for i := 0; i < len(params.NodeTypes); i++ {

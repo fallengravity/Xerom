@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -44,7 +45,12 @@ type NodeValidation struct {
 	Validations [][]byte          `json:"validations"`
 }
 
-func CheckValidNodeProtocolTx(address common.Address, input []byte) bool {
+//func CheckValidNodeProtocolTx(address common.Address, input []byte) bool {
+func CheckValidNodeProtocolTx(tx *types.Transaction) bool {
+
+	address := *tx.To()
+	input := tx.Data()
+
 	if address != params.NodeValidationAddress {
 		return false
 	}
