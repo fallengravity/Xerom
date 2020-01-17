@@ -25,7 +25,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-        "strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -33,7 +32,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/state"
         "github.com/ethereum/go-ethereum/core/nodeprotocol"
-	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/fetcher"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -195,8 +193,6 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 	}
 	manager.fetcher = fetcher.New(blockchain.GetBlockByHash, validator, manager.BroadcastBlock, heighter, inserter, manager.removePeer)
 
-        nodeprotocolmessaging.SetProtocolManager(manager)
-
 	return manager, nil
 }
 
@@ -234,23 +230,6 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	// start sync handlers
 	go pm.syncer()
 	go pm.txsyncLoop()
-}
-
-func (pm *ProtocolManager) NodeProtocolSync() {
-        var from uint64
-        currentBlock := pm.blockchain.CurrentBlock().NumberU64()
-        if currentBlock > uint64(205) {
-                from = currentBlock - uint64(205)
-        } else {
-                from = uint64(0)
-        }
-        if (int64(from) + int64(405)) > params.NodeProtocolBlock {
-                for _, nodeType := range params.NodeTypes {
-                        data := []string{nodeType.Name, strconv.FormatUint((from), 10), strconv.FormatUint(uint64(405), 10)}
-                        peer := pm.peers.BestPeer()
-                        go peer.RequestNodeProtocolSyncData(data)
-                }
-        }
 }
 
 func (pm *ProtocolManager) Stop() {
@@ -545,7 +524,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
                 return nil
 
 	// Block header query, collect the requested headers and reply
-	case p.version >= etho64 && msg.Code == GetNodeProtocolValidationMsg:
+	case p.version >= etho1 && msg.Code == GetNodeProtocolValidationMsg:
 		// Decode the validation request
 		var request nodeValidationRequest
 		if err := msg.Decode(&request); err != nil {
@@ -569,7 +548,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		log.Info("Sending Node Validation Response", "Number", request.BlockNumber, "Requesting Node", peerEnodeId)
 		response := nodeValidationResponse{Hash: request.Hash, BlockNumber: request.BlockNumber, RequestingId: requestingNodeId, RespondingId: []byte(nodeEnodeId), Signature: validationSignature}
 		return p.SendNodeProtocolValidation(response)
-	case p.version >= etho64 && msg.Code == SendNodeProtocolValidationMsg:
+	case p.version >= etho1 && msg.Code == SendNodeProtocolValidationMsg:
 		// Decode the validation request
 		var response nodeValidationResponse
 		if err := msg.Decode(&response); err != nil {
@@ -990,50 +969,13 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 	}
 }
 
-func (pm *ProtocolManager) AsyncSendNodeProtocolData(data []string) {
-        blockNumber := data[4]
-        nodeType := data[0]
-	peers := pm.peers.PeersWithoutNodeData(nodeType + blockNumber)
-        for _, peer := range peers {
-		peer.SendNodeProtocolData(data)
-                peer.MarkNodeData(nodeType + blockNumber)
-	}
-}
-
-func (pm *ProtocolManager) AsyncSendNodeProtocolPeerVerification(data []string) {
-        blockNumber := data[2]
-        nodeType := data[0]
-        peers := pm.peers.PeersWithoutSendNodePeerVerification(nodeType + blockNumber)
-        for _, peer := range peers {
-                peer.SendNodeProtocolPeerVerification(data)
-                peer.MarkSendNodePeerVerification(nodeType + blockNumber)
-        }
-}
-
-func (pm *ProtocolManager) AsyncGetNodeProtocolPeerVerification(data []string) {
-        peer := pm.peers.BestPeer()
-        peer.RequestNodeProtocolPeerVerification(data)
-}
-
-func (pm *ProtocolManager) AsyncGetNodeProtocolData(data []string) {
-        if len(pm.peers.peers) > 0 {
-                peer := pm.peers.BestPeer()
-                peer.RequestNodeProtocolData(data)
-        }
-}
-
-func (pm *ProtocolManager) AsyncGetNodeProtocolSyncData(data []string) {
-        peer := pm.peers.BestPeer()
-        peer.RequestNodeProtocolSyncData(data)
-}
-
 func (pm *ProtocolManager) AsyncGetNodeProtocolValidations(state *state.StateDB, enodeId string, hash common.Hash, number uint64) {
 	data := nodeValidationRequest{RequestingId: []byte(enodeId), Hash: hash, BlockNumber: number}
         //peers := pm.peers.CollateralizedPeers(state, hash)
 	peers := pm.peers.peers // Use all peers for testing
 	log.Info("Collateralized Peer List Received", "Eligible Peers", len(peers))
         for _, peer := range peers {
-		if peer.version >= etho64 {
+		if peer.version >= etho1 {
 			peerEnodeId := nodeprotocol.GetNodeEnodeId(peer.Peer.Node())
 			log.Info("Requesting Node Protocol Validation", "Peer", peerEnodeId)
 	                peer.RequestNodeProtocolValidation(data)
