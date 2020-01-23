@@ -29,9 +29,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
-	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/dnp"
+	"github.com/ethereum/go-ethereum/dnpdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -585,25 +586,25 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			var currentNodeAddress common.Address
 
 			// Get total current node count from contract and save to caching addresses
-			currentNodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
+			currentNodeCount := dnpdb.GetNodeCount(state, nodeType.ContractAddress)
 			if currentNodeCount > 0 {
 				// Determine next reward candidate and save data to caching addresses
-				currentNodeId, currentNodeIp,_, currentNodeAddress = nodeprotocol.GetNodeCandidate(state, rewardHeader.Hash(), currentNodeCount, nodeType.ContractAddress)
+				currentNodeId, currentNodeIp,_, currentNodeAddress = dnpdb.GetNodeCandidate(state, rewardHeader.Hash(), currentNodeCount, nodeType.ContractAddress)
 			} else {
 				currentNodeId = "None"
 				currentNodeIp = "None"
 				currentNodeAddress = common.HexToAddress("0x0")
 			}
 
-			nodeCount := nodeprotocol.UpdateNodeCount(state, currentNodeCount, nodeType.CountCachingAddresses)
-			nodeId, nodeIp, nodeAddress, nodeIdString, nodeIpString := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
+			nodeCount := dnpdb.UpdateNodeCount(state, currentNodeCount, nodeType.CountCachingAddresses)
+			nodeId, nodeIp, nodeAddress, nodeIdString, nodeIpString := dnpdb.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
 
 			nodeIdArray = append(nodeIdArray, nodeIdString)
 			nodeIpArray = append(nodeIpArray, nodeIpString)
 
 			if nodeCount > 0 {
 				totalNodeCount += nodeCount
-				if nodeprotocol.CheckNodeStatus(nodeType.Name, nodeId, nodeIp, payoutHeader.Hash(), payoutHeader.Number.Uint64()) {
+				if dnp.CheckNodeStatus(nodeType.Name, nodeId, nodeIp, payoutHeader.Hash(), payoutHeader.Number.Uint64()) {
 					log.Debug("Node Status Verified", "Node Type", nodeType.Name, "ID", nodeId, "IP", nodeIp)
 					nodeAddresses = append(nodeAddresses, nodeAddress)
 				} else {
@@ -617,12 +618,12 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			}
 
 			// Save node remainders
-			nodeRemainder := nodeprotocol.GetNodeRemainder(state, uint64(nodeCount), nodeType.RemainderAddress)
+			nodeRemainder := dnpdb.GetNodeRemainder(state, uint64(nodeCount), nodeType.RemainderAddress)
 			nodeRemainders = append(nodeRemainders, nodeRemainder)
 		}
 
 		//Checking for active node
-		nodeprotocol.CheckActiveNode(totalNodeCount, header.Hash(), header.Number.Int64())
+		dnp.CheckActiveNode(totalNodeCount, header.Hash(), header.Number.Int64())
 
 	}
 	params.NodeIdArray = nodeIdArray
@@ -740,7 +741,7 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 			priorityTxReward := new(big.Int)
 			priorityTxReward.Div(blockReward, big.NewInt(100))
 			for _, tx := range txs {
-				if nodeprotocol.CheckValidNodeProtocolTx(tx) {
+				if dnp.CheckValidNodeProtocolTx(tx) {
 					// Reward miner for mining priority node validation txs
 					state.AddBalance(header.Coinbase, priorityTxReward)
 				}

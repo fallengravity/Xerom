@@ -24,7 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
+	"github.com/ethereum/go-ethereum/dnpbridge"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -40,7 +40,7 @@ type PrivateAdminAPI struct {
 // NewPrivateAdminAPI creates a new API definition for the private admin methods
 // of the node itself.
 func NewPrivateAdminAPI(node *Node) *PrivateAdminAPI {
-	nodeprotocolmessaging.SetPrivateAdminApi(&PrivateAdminAPI{node: node})
+	dnpbridge.SetPrivateAdminApi(&PrivateAdminAPI{node: node})
 	return &PrivateAdminAPI{node: node}
 }
 

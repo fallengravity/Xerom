@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package nodeprotocol
+package dnp
 
 import (
 	"fmt"
@@ -30,8 +30,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/dnpbridge"
+	"github.com/ethereum/go-ethereum/dnpdb"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
@@ -128,13 +129,13 @@ func ValidateNodeProtocolSignatureByHash(nodeId []byte, signedValidation []byte,
 	recoveredId, _ := crypto.UnmarshalPubkey(recoveredPub)
 	recoveredIdString := fmt.Sprintf("%x", crypto.FromECDSAPub(recoveredId)[1:])
 
-	state, err := nodeprotocolmessaging.GetStateAt(hash)
+	state, err := dnpbridge.GetStateAt(hash)
 	if err != nil {
 		log.Error("Error Retrieving State DB", "Hash", hash)
 		return false
 	}
 
-	collateralizedPeerGroup := GetCollateralizedHashedGroup(state, hash)
+	collateralizedPeerGroup := dnpdb.GetCollateralizedHashedGroup(state, hash)
 
 	if _, ok := collateralizedPeerGroup[common.BytesToHash([]byte(recoveredIdString))]; ok {
 		log.Info("Node Protocol Signature Validation", "Valid", "True", "Author", recoveredIdString)

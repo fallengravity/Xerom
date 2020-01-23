@@ -28,8 +28,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/dnp"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
@@ -610,7 +610,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	//if !local && pool.gasPrice.Cmp(tx.GasPrice()) > 0 {
 	if pool.gasPrice.Cmp(tx.GasPrice()) > 0 {
 		if pool.chainconfig.IsPrometheus(pool.chain.CurrentBlock().Header().Number) {
-			if !nodeprotocol.CheckValidNodeProtocolTx(tx) {
+			if !dnp.CheckValidNodeProtocolTx(tx) {
 				return ErrUnderpriced
 			}
 		} else {

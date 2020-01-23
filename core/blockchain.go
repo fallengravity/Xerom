@@ -35,9 +35,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
-        "github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
-	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/dnp"
+        "github.com/ethereum/go-ethereum/dnpdb"
+        "github.com/ethereum/go-ethereum/dnpbridge"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -209,7 +210,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	go bc.update()
 
         // Set blockchain state for node protocol access
-        nodeprotocolmessaging.SetBlockchain(bc)
+        dnpbridge.SetBlockchain(bc)
 
 	return bc, nil
 }
@@ -512,28 +513,28 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) insert(block *types.Block) {
         // Check for next node up for reward
-        if block.Header().Number.Int64() > params.NodeProtocolBlock && !nodeprotocolmessaging.Syncing() {
+        if block.Header().Number.Int64() > params.NodeProtocolBlock && !dnpbridge.Syncing() {
                 rewardBlock := bc.GetBlockByNumber(block.NumberU64() - 100)
                 if rewardBlock != nil {
                         // Get current state snapshot
                         state, err := bc.State()
                         if err == nil {
-				if nodeprotocolmessaging.GetPeerCount() < params.MinCollateralizedPeerGroup {
-					nodes := nodeprotocol.GetCollateralizedNodes(state, rewardBlock.Header().Hash())
+				if dnpbridge.GetPeerCount() < params.MinCollateralizedPeerGroup {
+					nodes := dnpdb.GetCollateralizedNodes(state, rewardBlock.Header().Hash())
 					for _,node := range nodes {
 						log.Debug("Direct Connection To Collateralized Node Initiated", "Id", node.Id)
-						nodeprotocolmessaging.DirectConnectToNode(node.Id, node.Ip, node.Port)
+						dnpbridge.DirectConnectToNode(node.Id, node.Ip, node.Port)
 					}
 				}
 	                        for _, nodeType := range params.NodeTypes {
-                                        nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
+                                        nodeCount := dnpdb.GetNodeCount(state, nodeType.ContractAddress)
                                         if nodeCount > 0 {
-                                                selfEnodeId := nodeprotocol.GetNodeEnodeId(nodeprotocol.ActiveNode().Server().Self())
+                                                selfEnodeId := dnp.GetNodeEnodeId(dnp.ActiveNode().Server().Self())
 
 						if true { // For Testing
 						//if common.HexToHash(selfId) == common.HexToHash(nodeId) {
 							log.Debug("Local Node Determined To Be Part Of Upcoming Reward - Requesting Validations", "Number", rewardBlock.NumberU64())
-							nodeprotocolmessaging.RequestNodeProtocolValidations(state, selfEnodeId, rewardBlock.Header().Hash(), rewardBlock.NumberU64())
+							dnpbridge.RequestNodeProtocolValidations(state, selfEnodeId, rewardBlock.Header().Hash(), rewardBlock.NumberU64())
 							break
 						}
                                         }
@@ -1653,8 +1654,8 @@ func (bc *BlockChain) addBadBlock(block *types.Block) {
 // rotateBlockData initiates the node reward solver during sync
 func (bc *BlockChain) rotateBlockData(block *types.Block) bool {
         rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
-        nodeprotocol.SetHoldBlockNumber(rewardBlock.Number().Uint64())
-        if nodeprotocol.BadBlockRotation(params.NodeIdArray, params.NodeIpArray, rewardBlock.Hash()) {
+        dnp.SetHoldBlockNumber(rewardBlock.Number().Uint64())
+        if dnp.BadBlockRotation(params.NodeIdArray, params.NodeIpArray, rewardBlock.Hash()) {
                 return true
         }
         return false
@@ -1662,8 +1663,8 @@ func (bc *BlockChain) rotateBlockData(block *types.Block) bool {
 
 // checkBlockDataRotation validates the node reward solver and broadcasts
 func (bc *BlockChain) checkBlockDataRotation(block *types.Block) {
-        if nodeprotocol.HoldBlockCount > 0 && nodeprotocol.HoldBlockNumber != "" {
-                nodeprotocol.ResetHoldBlockCount()
+        if dnp.HoldBlockCount > 0 && dnp.HoldBlockNumber != "" {
+                dnp.ResetHoldBlockCount()
         } else {
                return
         }

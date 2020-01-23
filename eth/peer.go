@@ -27,7 +27,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/state"
-        "github.com/ethereum/go-ethereum/core/nodeprotocol"
+        "github.com/ethereum/go-ethereum/dnp"
+        "github.com/ethereum/go-ethereum/dnpdb"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -504,7 +505,7 @@ func (ps *peerSet) Len() int {
 func (ps *peerSet) String() []string {
         var peerList []string
         for _, peer := range ps.Peers() {
-                peerList = append(peerList, nodeprotocol.GetNodePublicKey(peer.Node()))
+                peerList = append(peerList, dnp.GetNodePublicKey(peer.Node()))
         }
         return peerList
 }
@@ -556,11 +557,11 @@ func (ps *peerSet) CollateralizedPeers(state *state.StateDB, hash common.Hash) [
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
-	nodes := nodeprotocol.GetCollateralizedNodes(state, hash)
+	nodes := dnpdb.GetCollateralizedNodes(state, hash)
 
 	list := make([]*peer, 0, len(ps.peers))
 	for _, p := range ps.peers {
-                peerId := nodeprotocol.GetNodePublicKey(p.Node())
+                peerId := dnp.GetNodePublicKey(p.Node())
 		if _, ok := nodes[peerId]; ok {
 			list = append(list, p)
 		}

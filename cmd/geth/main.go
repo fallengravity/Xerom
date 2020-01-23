@@ -32,7 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/console"
-	"github.com/ethereum/go-ethereum/core/nodeprotocol"
+	"github.com/ethereum/go-ethereum/dnp"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/internal/debug"
@@ -360,9 +360,9 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 		}
 	}
 	if ctx.GlobalIsSet(utils.NodeFlag.Name) {
-		nodeprotocol.SetProtocolFlag(true)
+		dnp.SetProtocolFlag(true)
 	} else {
-		nodeprotocol.SetProtocolFlag(false)
+		dnp.SetProtocolFlag(false)
 	}
-	nodeprotocol.SetActiveNode(stack)
+	dnp.SetActiveNode(stack)
 }

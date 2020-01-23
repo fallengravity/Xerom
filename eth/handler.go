@@ -31,8 +31,8 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/state"
-        "github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/eth/downloader"
+        "github.com/ethereum/go-ethereum/dnp"
 	"github.com/ethereum/go-ethereum/eth/fetcher"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
@@ -532,7 +532,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
 		requestingNodeId := request.RequestingId
-		peerEnodeId := nodeprotocol.GetNodeEnodeId(p.Peer.Node())
+		peerEnodeId := dnp.GetNodeEnodeId(p.Peer.Node())
 		if common.BytesToHash(requestingNodeId) != common.BytesToHash([]byte(peerEnodeId)) {
 			log.Warn("Fraudulent Node Validation Request Received", "Peer ID", []byte(peerEnodeId), "Requesting ID", requestingNodeId)
 			log.Warn("Fraudulent Node Validation Request Received", "Peer ID", peerEnodeId, "Requesting ID", requestingNodeId)
@@ -540,9 +540,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 		requestingHash := request.Hash
-		nodePrivateKey := nodeprotocol.GetNodePrivateKey(nodeprotocol.ActiveNode().Server())
-		nodeEnodeId := nodeprotocol.GetNodeEnodeId(nodeprotocol.ActiveNode().Server().Self())
-		validationSignature := nodeprotocol.SignNodeProtocolValidation(nodePrivateKey, requestingNodeId, requestingHash)
+		nodePrivateKey := dnp.GetNodePrivateKey(dnp.ActiveNode().Server())
+		nodeEnodeId := dnp.GetNodeEnodeId(dnp.ActiveNode().Server().Self())
+		validationSignature := dnp.SignNodeProtocolValidation(nodePrivateKey, requestingNodeId, requestingHash)
 
 		//log.Info("Sending Node Validation Response", "Number", request.BlockNumber, "Requesting Node", requestingNodeId, "Response Signature", validationSignature)
 		log.Info("Sending Node Validation Response", "Number", request.BlockNumber, "Requesting Node", peerEnodeId)
@@ -557,12 +557,12 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
                 if pm.peers.CheckPeerWithoutNodeProtocolValidationMessage(response.Hash, p) {
 	                p.MarkNodeProtocolValidationMessage(response.Hash)
-			nodeEnodeId := nodeprotocol.GetNodeEnodeId(nodeprotocol.ActiveNode().Server().Self())
-			peerPublicKey := nodeprotocol.GetNodePublicKey(p.Peer.Node())
+			nodeEnodeId := dnp.GetNodeEnodeId(dnp.ActiveNode().Server().Self())
+			peerPublicKey := dnp.GetNodePublicKey(p.Peer.Node())
 
-			if nodeprotocol.ValidateNodeProtocolSignature([]byte(nodeEnodeId), response.Signature, []byte(peerPublicKey), response.Hash) {
+			if dnp.ValidateNodeProtocolSignature([]byte(nodeEnodeId), response.Signature, []byte(peerPublicKey), response.Hash) {
 				//log.Info("Validated Node Protocol Signature Received", "Number", response.BlockNumber, "Requesting Node", string(response.RequestingId), "Responding Node", string(response.RespondingId), "Response Signature", response.Signature)
-				nodeprotocol.AddValidationSignature(response.Hash, response.Signature)
+				dnp.AddValidationSignature(response.Hash, response.Signature)
 			} else {
 				//log.Warn("Invalid Node Protocol Signature Received", "Number", response.BlockNumber, "Requesting Node", string(response.RequestingId), "Responding Node", string(response.RespondingId), "Response Signature", response.Signature)
 			}
@@ -976,7 +976,7 @@ func (pm *ProtocolManager) AsyncGetNodeProtocolValidations(state *state.StateDB,
 	log.Info("Collateralized Peer List Received", "Eligible Peers", len(peers))
         for _, peer := range peers {
 		if peer.version >= etho1 {
-			peerEnodeId := nodeprotocol.GetNodeEnodeId(peer.Peer.Node())
+			peerEnodeId := dnp.GetNodeEnodeId(peer.Peer.Node())
 			log.Info("Requesting Node Protocol Validation", "Peer", peerEnodeId)
 	                peer.RequestNodeProtocolValidation(data)
 		}
