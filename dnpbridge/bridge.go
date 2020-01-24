@@ -143,7 +143,10 @@ func CheckPeerSet(id string, ip string) bool {
 }
 
 func GetPeerCount() int {
-	return peerSet.Len()
+        if(peerSet != nil) {
+		return peerSet.Len()
+	}
+	return 0
 }
 
 func RequestNodeProtocolData(data []string) {
