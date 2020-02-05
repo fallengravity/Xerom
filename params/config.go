@@ -26,6 +26,8 @@ import (
 var NodeIdArray []string
 var NodeIpArray []string
 
+var NodeValidationAddress = common.HexToAddress("0xdF1Fa89137948338BF3bC96c340b0Ee97C144b23")
+
 // Main node type configuration for node-protocol
 var NodeTypes = []NodeType{
 	NodeType{
@@ -34,6 +36,7 @@ var NodeTypes = []NodeType{
 		BlockReward:                 big.NewInt(0),  //Initialize to 0 since we are using monetary policy config during consensus
 		RewardSplit:                 big.NewInt(10), //Declare split - ie 10 is 10%
 		RemainderAddress:            common.HexToAddress("0x0000000000000000000000000000000000000001"),
+		TxAddress:     	             common.HexToAddress("0x0000000000000000000000000000000000001000"),
 		ContractAddress:             common.HexToAddress("0x3717AD55666577Eb92fCa3e5F9F71958bD60c620"),
 		CountCachingAddresses:       []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000014"), common.HexToAddress("0x0000000000000000000000000000000000000013"), common.HexToAddress("0x0000000000000000000000000000000000000012"), common.HexToAddress("0x0000000000000000000000000000000000000011"), common.HexToAddress("0x0000000000000000000000000000000000000010")},
 		NodeIdCachingAddresses:      []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000114"), common.HexToAddress("0x0000000000000000000000000000000000000113"), common.HexToAddress("0x0000000000000000000000000000000000000112"), common.HexToAddress("0x0000000000000000000000000000000000000111"), common.HexToAddress("0x0000000000000000000000000000000000000110")},
@@ -46,6 +49,7 @@ var NodeTypes = []NodeType{
 		BlockReward:                 big.NewInt(0),  //Initialize to 0 since we are using monetary policy config during consensus
 		RewardSplit:                 big.NewInt(20), //Declare split - ie 10 is 10%
 		RemainderAddress:            common.HexToAddress("0x0000000000000000000000000000000000000002"),
+		TxAddress:     	             common.HexToAddress("0x0000000000000000000000000000000000002000"),
 		ContractAddress:             common.HexToAddress("0xc46Cc53b8F09fe6F4eB6b6dF8AD5c6Fe5DA6638B"),
 		CountCachingAddresses:       []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000024"), common.HexToAddress("0x0000000000000000000000000000000000000023"), common.HexToAddress("0x0000000000000000000000000000000000000022"), common.HexToAddress("0x0000000000000000000000000000000000000021"), common.HexToAddress("0x0000000000000000000000000000000000000020")},
 		NodeIdCachingAddresses:      []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000124"), common.HexToAddress("0x0000000000000000000000000000000000000123"), common.HexToAddress("0x0000000000000000000000000000000000000122"), common.HexToAddress("0x0000000000000000000000000000000000000121"), common.HexToAddress("0x0000000000000000000000000000000000000120")},
@@ -58,6 +62,7 @@ var NodeTypes = []NodeType{
 		BlockReward:                 big.NewInt(0),  //Initialize to 0 since we are using monetary policy config during consensus
 		RewardSplit:                 big.NewInt(30), //Declare split - ie 10 is 10%
 		RemainderAddress:            common.HexToAddress("0x0000000000000000000000000000000000000003"),
+		TxAddress:     	             common.HexToAddress("0x0000000000000000000000000000000000003000"),
 		ContractAddress:             common.HexToAddress("0xE44389C26FDEb581dEa7Df91Efd0665a7cd404c1"),
 		CountCachingAddresses:       []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000034"), common.HexToAddress("0x0000000000000000000000000000000000000033"), common.HexToAddress("0x0000000000000000000000000000000000000032"), common.HexToAddress("0x0000000000000000000000000000000000000031"), common.HexToAddress("0x0000000000000000000000000000000000000030")},
 		NodeIdCachingAddresses:      []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000134"), common.HexToAddress("0x0000000000000000000000000000000000000133"), common.HexToAddress("0x0000000000000000000000000000000000000132"), common.HexToAddress("0x0000000000000000000000000000000000000131"), common.HexToAddress("0x0000000000000000000000000000000000000130")},
@@ -70,6 +75,7 @@ var NodeTypes = []NodeType{
 		BlockReward:                 big.NewInt(0),  //Initialize to 0 since we are using monetary policy config during consensus
 		RewardSplit:                 big.NewInt(40), //Declare split - ie 10 is 10%
 		RemainderAddress:            common.HexToAddress("0x0000000000000000000000000000000000000004"),
+		TxAddress:     	             common.HexToAddress("0x0000000000000000000000000000000000004000"),
 		ContractAddress:             common.HexToAddress("0x93B7a5c74793DCba765a1dD163e1744622306651"),
 		CountCachingAddresses:       []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000044"), common.HexToAddress("0x0000000000000000000000000000000000000043"), common.HexToAddress("0x0000000000000000000000000000000000000042"), common.HexToAddress("0x0000000000000000000000000000000000000041"), common.HexToAddress("0x0000000000000000000000000000000000000040")},
 		NodeIdCachingAddresses:      []common.Address{common.HexToAddress("0x0000000000000000000000000000000000000144"), common.HexToAddress("0x0000000000000000000000000000000000000143"), common.HexToAddress("0x0000000000000000000000000000000000000142"), common.HexToAddress("0x0000000000000000000000000000000000000141"), common.HexToAddress("0x0000000000000000000000000000000000000140")},
@@ -231,6 +237,7 @@ type NodeType struct {
 	BlockReward                 *big.Int
 	RewardSplit                 *big.Int
 	RemainderAddress            common.Address
+	TxAddress                   common.Address
 	ContractAddress             common.Address
 	CountCachingAddresses       []common.Address
 	NodeIdCachingAddresses      []common.Address

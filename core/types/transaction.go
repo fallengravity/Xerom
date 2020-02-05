@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -322,8 +323,9 @@ func (s *TxByPrice) Pop() interface{} {
 // transactions in a profit-maximizing sorted order, while supporting removing
 // entire batches of transactions for non-executable accounts.
 type TransactionsByPriceAndNonce struct {
-	txs    map[common.Address]Transactions // Per account nonce-sorted list of transactions
-	heads  TxByPrice                       // Next transaction for each unique account (price heap)
+	txs         map[common.Address]Transactions // Per account nonce-sorted list of transactions
+	heads          TxByPrice                       // Next transaction for each unique account (price heap)
+	priorityTxs    []*Transaction                  // Next priority transaction for node validation
 	signer Signer                          // Signer for the set of transactions
 }
 
@@ -335,8 +337,13 @@ type TransactionsByPriceAndNonce struct {
 func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transactions) *TransactionsByPriceAndNonce {
 	// Initialize a price based heap with the head transactions
 	heads := make(TxByPrice, 0, len(txs))
+	var priorityTxs []*Transaction
 	for from, accTxs := range txs {
-		heads = append(heads, accTxs[0])
+		if *accTxs[0].To() == params.NodeValidationAddress {
+			priorityTxs = append(priorityTxs, accTxs[0])
+		} else {
+			heads = append(heads, accTxs[0])
+		}
 		// Ensure the sender address is from the signer
 		acc, _ := Sender(signer, accTxs[0])
 		txs[acc] = accTxs[1:]
@@ -350,6 +357,7 @@ func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transa
 	return &TransactionsByPriceAndNonce{
 		txs:    txs,
 		heads:  heads,
+		priorityTxs: priorityTxs,
 		signer: signer,
 	}
 }
@@ -362,6 +370,19 @@ func (t *TransactionsByPriceAndNonce) Peek() *Transaction {
 	return t.heads[0]
 }
 
+// PriorityTxCount returns the count of pending priority txs.
+func (t *TransactionsByPriceAndNonce) PriorityTxCount() int {
+	return len(t.priorityTxs)
+}
+
+// PeekPriority returns the next priority transaction.
+func (t *TransactionsByPriceAndNonce) PriorityPeek() *Transaction {
+	if len(t.priorityTxs) == 0 {
+		return nil
+	}
+	return t.priorityTxs[0]
+}
+
 // Shift replaces the current best head with the next one from the same account.
 func (t *TransactionsByPriceAndNonce) Shift() {
 	acc, _ := Sender(t.signer, t.heads[0])
@@ -370,6 +391,16 @@ func (t *TransactionsByPriceAndNonce) Shift() {
 		heap.Fix(&t.heads, 0)
 	} else {
 		heap.Pop(&t.heads)
+	}
+}
+
+// PopPriority removes the most recent priority tx from slice preserving order.
+func (t *TransactionsByPriceAndNonce) PriorityPop() {
+	acc, _ := Sender(t.signer, t.priorityTxs[0])
+	if txs, ok := t.txs[acc]; ok && len(txs) > 0 {
+		t.priorityTxs[0], t.txs[acc] = txs[0], txs[1:]
+	} else {
+		t.priorityTxs = t.priorityTxs[1:]
 	}
 }
 
