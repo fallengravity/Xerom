@@ -513,7 +513,7 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) insert(block *types.Block) {
         // Check for next node up for reward
-        if block.Header().Number.Int64() > params.NodeProtocolBlock && !dnpbridge.Syncing() {
+        if block.Header().Number.Int64() > params.NodeProtocolBlock && !dnpbridge.Syncing() && bc.chainConfig.IsPrometheus(block.Header().Number) {
                 rewardBlock := bc.GetBlockByNumber(block.NumberU64() - 100)
                 if rewardBlock != nil {
                         // Get current state snapshot
@@ -530,9 +530,8 @@ func (bc *BlockChain) insert(block *types.Block) {
                                         nodeCount := dnpdb.GetNodeCount(state, nodeType.ContractAddress)
                                         if nodeCount > 0 {
                                                 selfEnodeId := dnp.GetNodeEnodeId(dnp.ActiveNode().Server().Self())
-
-						if true { // For Testing
-						//if common.HexToHash(selfId) == common.HexToHash(nodeId) {
+                                                nodeCandidateId,_,_,_ := dnpdb.GetNodeCandidate(state, rewardBlock.Header().Hash(), nodeCount, nodeType.ContractAddress)
+						if common.HexToHash(selfEnodeId) == common.HexToHash(nodeCandidateId) {
 							log.Debug("Local Node Determined To Be Part Of Upcoming Reward - Requesting Validations", "Number", rewardBlock.NumberU64())
 							dnpbridge.RequestNodeProtocolValidations(state, selfEnodeId, rewardBlock.Header().Hash(), rewardBlock.NumberU64())
 							break
@@ -1254,7 +1253,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
                 }
                 // Validate the state using the default validator
                 if err := bc.Validator().ValidateState(block, parent, state, receipts, usedGas); err != nil {
-                        if block.Number().Int64() > params.NodeProtocolBlock {
+                        if block.Number().Int64() > params.NodeProtocolBlock && !bc.chainConfig.IsPrometheus(block.Number()) {
                                 if bc.rotateBlockData(block) {
                                         goto Start
                                 }
@@ -1277,7 +1276,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
                         return it.index, events, coalescedLogs, err
                 }
 
-                if block.Number().Int64() > params.NodeProtocolBlock {
+                if block.Number().Int64() > params.NodeProtocolBlock && bc.chainConfig.IsPrometheus(block.Number()) {
                         bc.checkBlockDataRotation(block)
                 }
 
