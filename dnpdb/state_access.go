@@ -132,6 +132,44 @@ func getNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 	return contractNodeId, contractNodeIp, contractNodePort, contractNodeAddress
 }
 
+func GetNodeStatus(state *state.StateDB, nodeAddress string, nodeTrackingAddress common.Address) (bool) {
+	solcIndex := int64(0)
+
+	hash := sha3.NewKeccak256()
+	var buf []byte
+
+	// Left-fill with zeros to meet abi packing standards
+	prepend := make([]byte, 12)
+
+	// Index is the contract variable index based on solc storage state standards
+	index := abi.U256(big.NewInt(solcIndex))
+
+	// Key is the mapping key to lookup
+	key := common.HexToAddress(nodeAddress).Bytes()[:]
+
+	// Prepare the Keccak256 seed
+	location := append(prepend, key...)
+	location = append(location, index...)
+
+	hash.Write(location)
+	buf = hash.Sum(nil)
+	storageLocation := common.BytesToHash(buf)
+
+	// Get offsets for a long enodeid string
+	nodeStatusLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(1)))
+
+	// Get storage state from the db using the hashed data
+	responseNodeStatus := state.GetState(nodeTrackingAddress, nodeStatusLocation)
+
+	// Assemble the comparison address
+	contractNodeStatus := common.HexToAddress(responseNodeStatus.Bytes())
+
+        if(contractNodeStatus == common.HexToAddress([]byte("true")) {
+		return true
+        }
+	return false
+}
+
 func GetCollateralizedNodes(state *state.StateDB, blockHash common.Hash) map[string]NodeInfo {
 	collateralizedNodes := make(map[string]NodeInfo)
 	for _, nodeType := range params.NodeTypes {
