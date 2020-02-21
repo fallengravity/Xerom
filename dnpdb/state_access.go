@@ -1,5 +1,5 @@
 // Copyright 2015 The go-ethereum Authors
-// Copyright 2019 The Ether-1 Development Team
+// Copyright 2020 The Etho.Black Development Team
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package nodeprotocol
+package dnpdb
 
 import (
 	"math/big"
@@ -25,10 +25,17 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 )
 
+type NodeInfo struct {
+	Id   string
+	Ip   string
+	Port string
+}
+
 // Get next node reward candidate based on current state and nodeCount
-func GetNodeCandidate(state *state.StateDB, blockHash common.Hash, nodeCount int64, contractAddress common.Address) (string, string, common.Address) {
+func GetNodeCandidate(state *state.StateDB, blockHash common.Hash, nodeCount int64, contractAddress common.Address) (string, string, string, common.Address) {
 	nodeIndex := new(big.Int).Mod(blockHash.Big(), big.NewInt(nodeCount)).Int64()
 	return getNodeData(state, getNodeKey(state, nodeIndex, contractAddress), contractAddress)
 }
@@ -68,7 +75,7 @@ func getNodeKey(state *state.StateDB, nodeIndex int64, contractAddress common.Ad
 	return nodeAddressString.String()
 }
 
-func getNodeData(state *state.StateDB, nodeAddress string, contractAddress common.Address) (string, string, common.Address) {
+func getNodeData(state *state.StateDB, nodeAddress string, contractAddress common.Address) (string, string, string, common.Address) {
 	solcIndex := int64(0)
 
 	hash := sha3.NewKeccak256()
@@ -105,6 +112,7 @@ func getNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 
 	nodeAddressLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(1)))
 	nodeIpLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(3)))
+	nodePortLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(4)))
 
 	// Get storage state from the db using the hashed data
 	responseNodeId1 := state.GetState(contractAddress, finalNodeIdLocation1)
@@ -113,13 +121,95 @@ func getNodeData(state *state.StateDB, nodeAddress string, contractAddress commo
 	responseNodeId4 := state.GetState(contractAddress, finalNodeIdLocation4)
 	responseNodeAddress := state.GetState(contractAddress, nodeAddressLocation)
 	responseNodeIp := state.GetState(contractAddress, nodeIpLocation)
+	responseNodePort := state.GetState(contractAddress, nodePortLocation)
 
 	// Assemble the strings
 	contractNodeId := stripCtlAndExtFromBytes(string(responseNodeId1.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId2.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId3.Bytes())) + stripCtlAndExtFromBytes(string(responseNodeId4.Bytes()))
 	contractNodeAddress := common.BytesToAddress(responseNodeAddress.Bytes())
 	contractNodeIp := stripCtlAndExtFromBytes(string(responseNodeIp.Bytes()))
+	contractNodePort := stripCtlAndExtFromBytes(string(responseNodePort.Bytes()))
 
-	return contractNodeId, contractNodeIp, contractNodeAddress
+	return contractNodeId, contractNodeIp, contractNodePort, contractNodeAddress
+}
+
+func GetNodeStatus(state *state.StateDB, nodeAddress string, nodeTrackingAddress common.Address) (bool) {
+	solcIndex := int64(0)
+
+	hash := sha3.NewKeccak256()
+	var buf []byte
+
+	// Left-fill with zeros to meet abi packing standards
+	prepend := make([]byte, 12)
+
+	// Index is the contract variable index based on solc storage state standards
+	index := abi.U256(big.NewInt(solcIndex))
+
+	// Key is the mapping key to lookup
+	key := common.HexToAddress(nodeAddress).Bytes()[:]
+
+	// Prepare the Keccak256 seed
+	location := append(prepend, key...)
+	location = append(location, index...)
+
+	hash.Write(location)
+	buf = hash.Sum(nil)
+	storageLocation := common.BytesToHash(buf)
+
+	// Get offsets for a long enodeid string
+	nodeStatusLocation := common.BigToHash(new(big.Int).Add(storageLocation.Big(), big.NewInt(1)))
+
+	// Get storage state from the db using the hashed data
+	responseNodeStatus := state.GetState(nodeTrackingAddress, nodeStatusLocation)
+
+	// Assemble the comparison address
+	contractNodeStatus := common.HexToAddress(responseNodeStatus.Bytes())
+
+        if(contractNodeStatus == common.HexToAddress([]byte("true")) {
+		return true
+        }
+	return false
+}
+
+func GetCollateralizedNodes(state *state.StateDB, blockHash common.Hash) map[string]NodeInfo {
+	collateralizedNodes := make(map[string]NodeInfo)
+	for _, nodeType := range params.NodeTypes {
+		nodeCount := GetNodeCount(state, nodeType.ContractAddress)
+		nodeIndex := new(big.Int).Mod(blockHash.Big(), big.NewInt(nodeCount)).Int64()
+		loopCount := int64(params.MinCollateralizedPeerGroup/len(params.NodeTypes))
+		if loopCount >= nodeCount {
+			loopCount = nodeCount - 1
+		}
+		for i := int64(1); i <= loopCount; i++ {
+			searchIndex := nodeIndex + i
+			if searchIndex > nodeCount {
+				searchIndex = int64(0)
+			}
+			id, ip, port,_ := getNodeData(state, getNodeKey(state, searchIndex, nodeType.ContractAddress), nodeType.ContractAddress)
+			collateralizedNodes[id] = NodeInfo{Id: id, Ip: ip, Port: port}
+		}
+	}
+	return collateralizedNodes
+}
+
+func GetCollateralizedHashedGroup(state *state.StateDB, blockHash common.Hash) map[common.Hash]NodeInfo {
+	collateralizedGroup := make(map[common.Hash]NodeInfo)
+	for _, nodeType := range params.NodeTypes {
+		nodeCount := GetNodeCount(state, nodeType.ContractAddress)
+		nodeIndex := new(big.Int).Mod(blockHash.Big(), big.NewInt(nodeCount)).Int64()
+		loopCount := int64(params.MinCollateralizedPeerGroup/len(params.NodeTypes))
+		if loopCount >= nodeCount {
+			loopCount = nodeCount - 1
+		}
+		for i := int64(1); i <= loopCount; i++ {
+			searchIndex := nodeIndex + i
+			if searchIndex > nodeCount {
+				searchIndex = int64(0)
+			}
+			id, ip, port,_ := getNodeData(state, getNodeKey(state, searchIndex, nodeType.ContractAddress), nodeType.ContractAddress)
+			collateralizedGroup[common.BytesToHash([]byte(id + ":" + ip))] = NodeInfo{Id: id, Ip: ip, Port: port}
+		}
+	}
+	return collateralizedGroup
 }
 
 func UpdateNodeCount(state *state.StateDB, currentNodeCount int64, countAddresses []common.Address) uint64 {
@@ -159,4 +249,16 @@ func UpdateNodeCandidate(state *state.StateDB, currentNodeId string, currentNode
 	log.Debug("Updating Node Reward Candidates", "ID", nodeId, "IP", nodeIp, "Address", rewardAddress)
 
 	return nodeId, nodeIp, rewardAddress, nodeIdString, nodeIpString
+}
+
+func CheckNodeCandidate(state *state.StateDB, nodeAddress common.Address) bool {
+	for _,nodeType := range params.NodeTypes {
+		for _, cachingAddress := range nodeType.NodeAddressCachingAddresses {
+			cachedRewardAddress := common.BytesToAddress(state.GetCode(cachingAddress))
+			if nodeAddress == cachedRewardAddress {
+				return true
+			}
+		}
+	}
+	return false
 }

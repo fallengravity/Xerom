@@ -1,5 +1,5 @@
 // Copyright 2015 The go-ethereum Authors
-// Copyright 2019 The Ether-1 Development Team
+// Copyright 2019 The Etho.Black Development Team
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package nodeprotocolmessaging
+package dnpbridge
 
 import (
 	"sync"
@@ -23,13 +23,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 var pm Manager
 var peerSet PeerSet
 var bc Blockchain
 var SyncWg sync.WaitGroup
-var Syncing bool
+var privateAdminApi PrivateAdminAPI
+var publicEthereumApi PublicEthereumAPI
 
 type Manager interface {
 	SyncStatus() bool
@@ -37,12 +39,21 @@ type Manager interface {
 	AsyncSendNodeProtocolData(data []string)
 	AsyncGetNodeProtocolSyncData(data []string)
 	AsyncGetNodeProtocolPeerVerification(data []string)
+	AsyncGetNodeProtocolValidations(state *state.StateDB, id string, hash common.Hash, number uint64)
 }
 
 type PeerSet interface {
 	Len() int
 	String() []string
 	Ips() map[string]string
+}
+
+type PrivateAdminAPI interface {
+	AddPeer(url string) (bool, error)
+}
+
+type PublicEthereumAPI interface {
+	Syncing() (interface {}, error)
 }
 
 type Blockchain interface {
@@ -57,6 +68,28 @@ func SetBlockchain(blockchain Blockchain) {
 	bc = blockchain
 }
 
+func SetPrivateAdminApi(api PrivateAdminAPI) {
+	privateAdminApi = api
+}
+
+func SetPublicEthereumApi(api PublicEthereumAPI) {
+	publicEthereumApi = api
+}
+
+func Syncing() bool {
+	data, err := publicEthereumApi.Syncing()
+	if err == nil {
+		if data == false {
+			log.Debug("Blockchain Sync Status", "Syncing", "False")
+			return false
+		} else {
+			log.Debug("Blockchain Sync Status", "Syncing", "True")
+			return true
+		}
+	}
+	return true
+}
+
 func GetStateAt(hash common.Hash) (*state.StateDB, error) {
 	return bc.StateAt(hash)
 }
@@ -65,12 +98,25 @@ func GetBlockByHash(hash common.Hash) *types.Block {
 	return bc.GetBlockByHash(hash)
 }
 
+func GetBlockByNumber(number uint64) *types.Block {
+	return bc.GetBlockByNumber(number)
+}
+
 func SetProtocolManager(manager Manager) {
 	pm = manager
 }
 
 func SetPeerSet(ps PeerSet) {
 	peerSet = ps
+}
+
+func AddPeer(url string) {
+	privateAdminApi.AddPeer(url)
+}
+
+func DirectConnectToNode(id string, ip string, port string) {
+	enodeUrl := "enode://" + id + "@" + ip + ":" + port
+	AddPeer(enodeUrl)
 }
 
 func RollBackChain(count uint64) {
@@ -97,7 +143,10 @@ func CheckPeerSet(id string, ip string) bool {
 }
 
 func GetPeerCount() int {
-	return peerSet.Len()
+        if(peerSet != nil) {
+		return peerSet.Len()
+	}
+	return 0
 }
 
 func RequestNodeProtocolData(data []string) {
@@ -116,9 +165,6 @@ func RequestNodeProtocolPeerVerification(data []string) {
 	pm.AsyncGetNodeProtocolPeerVerification(data)
 }
 
-func GetSyncStatus() bool {
-	if Syncing {
-		Syncing = pm.SyncStatus()
-	}
-	return Syncing
+func RequestNodeProtocolValidations(state *state.StateDB, id string, hash common.Hash, number uint64) {
+	pm.AsyncGetNodeProtocolValidations(state, id, hash, number)
 }

@@ -1,5 +1,5 @@
 // Copyright 2015 The go-ethereum Authors
-// Copyright 2019 The Ether-1 Development Team
+// Copyright 2020 The Etho.Black Development Team
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -15,24 +15,17 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package nodeprotocol
+package dnp
 
 import (
-	"crypto/ecdsa"
 	"errors"
-	"fmt"
-	"net"
-	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -227,34 +220,4 @@ func GetNodeProtocolDataGroup(nodeType string, startBlock uint64, endBlock uint6
 		}
 	}
 	return hashes, nodes, numbers, ips, nil
-}
-
-// GetNodeId return enodeid in a string format from *enode.Node
-func GetNodeId(n *enode.Node) string {
-	var (
-		scheme enr.ID
-		nodeid string
-		key    ecdsa.PublicKey
-	)
-	n.Load(&scheme)
-	n.Load((*enode.Secp256k1)(&key))
-	nid := n.ID()
-	switch {
-	case scheme == "v4" || key != ecdsa.PublicKey{}:
-		nodeid = fmt.Sprintf("%x", crypto.FromECDSAPub(&key)[1:])
-	default:
-		nodeid = fmt.Sprintf("%s.%x", scheme, nid[:])
-	}
-	u := url.URL{Scheme: "enode"}
-	if n.Incomplete() {
-		u.Host = nodeid
-	} else {
-		addr := net.TCPAddr{IP: n.IP(), Port: n.TCP()}
-		u.User = url.User(nodeid)
-		u.Host = addr.String()
-		if n.UDP() != n.TCP() {
-			u.RawQuery = "discport=" + strconv.Itoa(n.UDP())
-		}
-	}
-	return u.User.String()
 }

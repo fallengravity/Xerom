@@ -32,16 +32,17 @@ import (
 const (
 	eth62 = 62
 	eth63 = 63
+	etho1 = 1000
 )
 
 // ProtocolName is the official short name of the protocol used during capability negotiation.
 var ProtocolName = "eth"
 
 // ProtocolVersions are the supported versions of the eth protocol (first is primary).
-var ProtocolVersions = []uint{eth63, eth62}
+var ProtocolVersions = []uint{etho1, eth63, eth62}
 
 // ProtocolLengths are the number of implemented message corresponding to different protocol versions.
-var ProtocolLengths = []uint64{23, 8}
+var ProtocolLengths = []uint64{25, 23, 8}
 
 const ProtocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a protocol message
 
@@ -68,6 +69,10 @@ const (
 	SendNodeProtocolSyncDataMsg = 0x14
 	GetNodeProtocolPeerVerificationMsg  = 0x15
 	SendNodeProtocolPeerVerificationMsg = 0x16
+
+	// Protocol messages belonging to etho/1
+	GetNodeProtocolValidationMsg   = 0x17
+	SendNodeProtocolValidationMsg  = 0x18
 )
 
 type errCode int
@@ -187,3 +192,19 @@ type blockBody struct {
 
 // blockBodiesData is the network packet for block content distribution.
 type blockBodiesData []*blockBody
+
+// nodeValidationRequest represents the data sent to request a peer validation
+type nodeValidationRequest struct {
+	Hash         common.Hash // Block hash of validation request
+	BlockNumber  uint64      // Block number of validation request
+	RequestingId []byte      // Requesting node public key
+}
+
+// nodeValidationResponse represents the data sent in response to a peer validation request
+type nodeValidationResponse struct {
+	Hash         common.Hash // Block hash of validation request
+	BlockNumber  uint64      // Block number of validation request
+	RequestingId []byte      // Requesting node public key
+	RespondingId []byte      // Responding node public key
+	Signature    []byte      // Signed validation
+}

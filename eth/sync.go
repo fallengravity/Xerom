@@ -195,9 +195,6 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 		}
 	}
 
-        // Synchronize node-protocol data
-        go pm.NodeProtocolSync()
-
 	// Run the sync cycle, and disable fast sync if we've went past the pivot block
 	if err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode); err != nil {
 		return
