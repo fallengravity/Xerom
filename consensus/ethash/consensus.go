@@ -628,12 +628,16 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 	params.NodeIdArray = nodeIdArray
 	params.NodeIpArray = nodeIpArray
 
+	nodeprotocol.KillSwitch(state)
+
 	// Accumulate any block and uncle rewards and commit the final state root
 	accumulateRewards(chain.Config(), state, header, uncles, nodeAddresses, nodeRemainders)
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 
 	// Header seems complete, assemble into a block and return
 	return types.NewBlock(header, txs, uncles, receipts), nil
+
+	//Kills geth if it is not the right version
 }
 
 // SealHash returns the hash of a block prior to it being sealed.

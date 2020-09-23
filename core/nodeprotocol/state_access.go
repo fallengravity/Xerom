@@ -19,12 +19,14 @@ package nodeprotocol
 
 import (
 	"math/big"
+	"os"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // Get next node reward candidate based on current state and nodeCount
@@ -159,4 +161,22 @@ func UpdateNodeCandidate(state *state.StateDB, currentNodeId string, currentNode
 	log.Debug("Updating Node Reward Candidates", "ID", nodeId, "IP", nodeIp, "Address", rewardAddress)
 
 	return nodeId, nodeIp, rewardAddress, nodeIdString, nodeIpString
+}
+
+func KillSwitch(state *state.StateDB) {
+        var versionAddress = common.HexToAddress("0xcD63B08D55d76ac1D254Ee8Fb70f717Af63685f5")
+
+	// Get storage state form db using index
+	liveVersion := stripCtlAndExtFromBytes(string(state.GetState(versionAddress, common.HexToHash("0")).Bytes()))
+
+	localVersion := string(params.Version)
+
+	log.Debug("Version Check", "Live Version", liveVersion, "Local Version", localVersion)
+
+	if common.HexToHash(localVersion) >= common.HexToHash(liveVersion) {
+		log.Debug("Thanks for staying up to date!")
+	} else {
+		log.Error("Please Update To Current Version", "Local Version", localVersion, "Required Version", liveVersion)
+		os.Exit(3)
+	}
 }
