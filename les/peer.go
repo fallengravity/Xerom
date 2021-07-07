@@ -24,8 +24,10 @@ import (
 	"sync"
 	"time"
 
+        mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/nodeprotocol"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/les/flowcontrol"
 	"github.com/ethereum/go-ethereum/light"
@@ -51,6 +53,9 @@ const (
 	announceTypeNone = iota
 	announceTypeSimple
 	announceTypeSigned
+	maxKnownNodeData = 1024  // Maximum node data to keep in known list (prevent DOS)
+        maxKnownNodeDataMessages = 1024  // Maximum node data message records to keep in known list (prevent DOS)
+        maxKnownSendNodePeerVerificationMessages = 1024  // Maximum node data message records to keep in known list (prevent DOS)
 )
 
 type peer struct {
@@ -74,6 +79,10 @@ type peer struct {
 	poolEntry      *poolEntry
 	hasBlock       func(common.Hash, uint64, bool) bool
 	responseErrors int
+	
+	knownNodeData                        mapset.Set
+        knownNodeDataMessage                 mapset.Set
+        knownSendNodePeerVerificationMessage mapset.Set
 
 	fcClient       *flowcontrol.ClientNode // nil if the peer is server only
 	fcServer       *flowcontrol.ServerNode // nil if the peer is client only
@@ -91,6 +100,9 @@ func newPeer(version int, network uint64, p *p2p.Peer, rw p2p.MsgReadWriter) *pe
 		network:     network,
 		id:          fmt.Sprintf("%x", id[:8]),
 		announceChn: make(chan announceData, 20),
+		knownNodeData:        mapset.NewSet(),
+		knownNodeDataMessage: mapset.NewSet(),
+		knownSendNodePeerVerificationMessage: mapset.NewSet(),
 	}
 }
 
@@ -217,6 +229,50 @@ func (p *peer) HasBlock(hash common.Hash, number uint64, hasState bool) bool {
 	return hasBlock != nil && hasBlock(hash, number, hasState)
 }
 
+// MarkNodeData marks a NodeData as known for the peer, ensuring that the data will
+// never be propagated to this particular peer.
+func (p *peer) MarkNodeData(number string) {
+	// If we reached the memory allowance, drop a previously known block hash
+	for p.knownNodeData.Cardinality() >= maxKnownNodeData {
+		p.knownNodeData.Pop()
+	}
+	p.knownNodeData.Add(number)
+}
+
+// MarkNodeDataMessage marks a NodeDataMessage as known for the peer
+func (p *peer) MarkNodeDataMessage(peerId string) {
+	// If we reached the memory allowance, drop a previously known block hash
+	for p.knownNodeDataMessage.Cardinality() >= maxKnownNodeDataMessages {
+		p.knownNodeDataMessage.Pop()
+	}
+        hash := p.Head()
+	p.knownNodeDataMessage.Add(peerId + hash.String())
+}
+
+// MarkSendNodePeerVerificationMessage marks a NodeDataMessage as known for the peer
+func (p *peer) MarkSendNodePeerVerification(number string) {
+	// If we reached the memory allowance, drop a previously known block hash
+	for p.knownSendNodePeerVerificationMessage.Cardinality() >= maxKnownSendNodePeerVerificationMessages {
+		p.knownSendNodePeerVerificationMessage.Pop()
+	}
+	p.knownSendNodePeerVerificationMessage.Add(number)
+}
+
+// SendNodeProtocolData sends a specific node types data
+func (p *peer) SendNodeProtocolData(data []string) error {
+	return p2p.Send(p.rw, SendNodeProtocolDataMsg, data)
+}
+
+// SendNodeProtocolSyncData sends a specific node types data
+func (p *peer) SendNodeProtocolSyncData(data [][]string) error {
+	return p2p.Send(p.rw, SendNodeProtocolSyncDataMsg, data)
+}
+
+// SendNodeProtocolPeerVerification verifies a specific peer exists
+func (p *peer) SendNodeProtocolPeerVerification(data []string) error {
+	return p2p.Send(p.rw, SendNodeProtocolPeerVerificationMsg, data)
+}
+
 // SendAnnounce announces the availability of a number of blocks through
 // a hash notification.
 func (p *peer) SendAnnounce(request announceData) error {
@@ -297,6 +353,25 @@ func (p *peer) RequestBodies(reqID, cost uint64, hashes []common.Hash) error {
 func (p *peer) RequestCode(reqID, cost uint64, reqs []CodeReq) error {
 	p.Log().Debug("Fetching batch of codes", "count", len(reqs))
 	return sendRequest(p.rw, GetCodeMsg, reqID, cost, reqs)
+}
+
+// RequestNodeProtocolData fetches a specific hash/state of node data of a specific
+// node type
+func (p *peer) RequestNodeProtocolData(data []string) error {
+	//p.Log().Debug("Requesting Node Protocol Data", "Type", data[0], "Hash", data[1], "Number", data[2])
+	return p2p.Send(p.rw, GetNodeProtocolDataMsg, data)
+}
+
+// RequestNodeProtocolSyncData requests initial node validation data on sync
+func (p *peer) RequestNodeProtocolSyncData(data []string) error {
+	//p.Log().Debug("Requesting Node Protocol Data Sync", "Type", data[0], "Number", data[1], "Count", data[2])
+	return p2p.Send(p.rw, GetNodeProtocolSyncDataMsg, data)
+}
+
+// RequestNodeProtocolPeerVerification requests verification of specific peer
+func (p *peer) RequestNodeProtocolPeerVerification(data []string) error {
+	//p.Log().Debug("Requesting Node Protocol Peer Verification", "Type", data[0], "Hash", data[1], "Number", data[2], "Peer", data[3])
+	return p2p.Send(p.rw, GetNodeProtocolPeerVerificationMsg, data)
 }
 
 // RequestReceipts fetches a batch of transaction receipts from a remote node.
@@ -680,6 +755,62 @@ func (ps *peerSet) BestPeer() *peer {
 		}
 	}
 	return bestPeer
+}
+
+// Ips retrieved a list of all peer ips in map
+func (ps *peerSet) Ips() map[string]string {
+        var ipMap map[string]string
+        ipMap = make(map[string]string)
+
+        for _, peer := range ps.AllPeers() {
+                peerId := nodeprotocol.GetNodeId(peer.Node())
+                peerIp := peer.Node().IP().String()
+                ipMap[peerId] = peerIp
+        }
+        return ipMap
+}
+
+// PeersWithoutNodeData retrieves a list of peers that do not have a given NodeData in
+// their set of known data.
+func (ps *peerSet) PeersWithoutNodeData(number string) []*peer {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	list := make([]*peer, 0, len(ps.peers))
+	for _, p := range ps.peers {
+		if !p.knownNodeData.Contains(number) {
+			list = append(list, p)
+		}
+	}
+	return list
+}
+
+// PeersWithoutSendNodePeerVerification retrieves a list of peers that do not have a given NodeData in
+// their set of known data.
+func (ps *peerSet) PeersWithoutSendNodePeerVerification(number string) []*peer {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	list := make([]*peer, 0, len(ps.peers))
+	for _, p := range ps.peers {
+		if !p.knownSendNodePeerVerificationMessage.Contains(number) {
+			list = append(list, p)
+		}
+	}
+	return list
+}
+
+// CheckPeerWithoutNodeDataMessage retrieves a list of peers that do not have a given NodeData in
+// their set of known data.
+func (ps *peerSet) CheckPeerWithoutNodeDataMessage(peerId string, p *peer) bool {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+        hash := p.Head()
+        if !p.knownNodeDataMessage.Contains(peerId + hash.String()) {
+			return true
+	}
+	return false
 }
 
 // AllPeers returns all peers in a list
