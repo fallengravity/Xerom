@@ -30,6 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/nodeprotocol"
+	"github.com/ethereum/go-ethereum/core/nodeprotocolmessaging"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
@@ -568,8 +569,8 @@ func (ethash *Ethash) Prepare(chain consensus.ChainReader, header *types.Header)
 func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	var nodeAddresses []common.Address
 	var nodeRemainders []*big.Int
-	var nodeIpArray []string
-	var nodeIdArray []string
+	//var nodeIpArray []string
+	//var nodeIdArray []string
 
 	// If node-protocol is active, validate node payment address
 	if header.Number.Int64() > params.NodeProtocolBlock && header.Number.Int64() > 105 {
@@ -588,7 +589,7 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			currentNodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
 			if currentNodeCount > 0 {
 				// Determine next reward candidate and save data to caching addresses
-				currentNodeId, currentNodeIp, currentNodeAddress = nodeprotocol.GetNodeCandidate(state, rewardHeader.Hash(), currentNodeCount, nodeType.ContractAddress)
+				currentNodeId, currentNodeIp,_, currentNodeAddress = nodeprotocol.GetNodeCandidate(state, rewardHeader.Hash(), currentNodeCount, nodeType.ContractAddress)
 			} else {
 				currentNodeId = "None"
 				currentNodeIp = "None"
@@ -596,23 +597,22 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			}
 
 			nodeCount := nodeprotocol.UpdateNodeCount(state, currentNodeCount, nodeType.CountCachingAddresses)
-			nodeId, nodeIp, nodeAddress, nodeIdString, nodeIpString := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
+			nodeAddress := nodeprotocol.UpdateNodeCandidate(state, currentNodeId, currentNodeIp, currentNodeAddress, nodeType.NodeIdCachingAddresses, nodeType.NodeIpCachingAddresses, nodeType.NodeAddressCachingAddresses)
 
-			nodeIdArray = append(nodeIdArray, nodeIdString)
-			nodeIpArray = append(nodeIpArray, nodeIpString)
+			//nodeValidationArray = append(nodeValidationArray, nodeValidationString)
 
 			if nodeCount > 0 {
 				totalNodeCount += nodeCount
-				if nodeprotocol.CheckNodeStatus(nodeType.Name, nodeId, nodeIp, payoutHeader.Hash(), payoutHeader.Number.Uint64()) {
-					log.Debug("Node Status Verified", "Node Type", nodeType.Name, "ID", nodeId, "IP", nodeIp)
+				if nodeprotocol.CheckNodeStatus(nodeType.Name, payoutHeader.Number.Uint64()) {
+					log.Debug("Node Status Verified", "Node Type", nodeType.Name, "Number", payoutHeader.Number.Uint64())
 					nodeAddresses = append(nodeAddresses, nodeAddress)
 				} else {
-					log.Debug("Node Status Not Verified - Deferring To Remainder Address", "Node Type", nodeType.Name, "ID", nodeId, "IP", nodeIp)
+					log.Debug("Node Status Not Verified - Deferring To Remainder Address", "Node Type", nodeType.Name, "Number", payoutHeader.Number.Uint64())
 					nodeAddresses = append(nodeAddresses, nodeType.RemainderAddress)
 				}
 			} else {
 				// Send reward to remainder address if zero nodes exist
-				log.Debug("No Active Nodes Found - Deferring to Remainder Address", "Node Type", nodeType.Name, "ID", nodeId, "IP", nodeIp)
+				log.Debug("No Active Nodes Found - Deferring to Remainder Address", "Node Type", nodeType.Name, "Number", payoutHeader.Number.Uint64())
 				nodeAddresses = append(nodeAddresses, nodeType.RemainderAddress)
 			}
 
@@ -621,12 +621,16 @@ func (ethash *Ethash) Finalize(chain consensus.ChainReader, header *types.Header
 			nodeRemainders = append(nodeRemainders, nodeRemainder)
 		}
 
-		//Checking for active node
-		nodeprotocol.CheckActiveNode(totalNodeCount, header.Hash(), header.Number.Int64())
+		if !nodeprotocolmessaging.GetSyncStatus() {
+			//Checking for active node
+			nodeprotocol.CheckActiveNode(totalNodeCount, header.Hash(), header.Number.Int64())
+		} else {
+			//Checking for active node during sync
+			nodeprotocol.CheckActiveNodeSync(totalNodeCount, header.Hash(), header.Number.Int64())
+		}
 
 	}
-	params.NodeIdArray = nodeIdArray
-	params.NodeIpArray = nodeIpArray
+	//params.NodeValidationArray = nodeValidationArray
 
 	// Accumulate any block and uncle rewards and commit the final state root
 	accumulateRewards(chain.Config(), state, header, uncles, nodeAddresses, nodeRemainders)

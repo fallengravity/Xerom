@@ -32,16 +32,17 @@ import (
 const (
 	eth62 = 62
 	eth63 = 63
+	etho64 = 64
 )
 
 // ProtocolName is the official short name of the protocol used during capability negotiation.
 var ProtocolName = "eth"
 
 // ProtocolVersions are the supported versions of the eth protocol (first is primary).
-var ProtocolVersions = []uint{eth63, eth62}
+var ProtocolVersions = []uint{etho64, eth63, eth62}
 
 // ProtocolLengths are the number of implemented message corresponding to different protocol versions.
-var ProtocolLengths = []uint64{23, 8}
+var ProtocolLengths = []uint64{25, 23, 8}
 
 const ProtocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a protocol message
 
@@ -68,6 +69,10 @@ const (
 	SendNodeProtocolSyncDataMsg = 0x14
 	GetNodeProtocolPeerVerificationMsg  = 0x15
 	SendNodeProtocolPeerVerificationMsg = 0x16
+
+	// Protocol messages belonging to etho/64
+	GetNodeProtocolValidationMsg  = 0x17
+	SendNodeProtocolValidationMsg = 0x18
 )
 
 type errCode int
@@ -179,10 +184,23 @@ type newBlockData struct {
 	TD    *big.Int
 }
 
+// newBlockWithValidationData is the network packet for the block propagation message with validation data.
+type newBlockValidationsData struct {
+	Block *types.Block
+	TD    *big.Int
+	Validations []string
+}
+
 // blockBody represents the data content of a single block.
 type blockBody struct {
 	Transactions []*types.Transaction // Transactions contained within a block
 	Uncles       []*types.Header      // Uncles contained within a block
+}
+
+// blockBodyValidations represents the data content of a single block with validations.
+type blockBodyValidations struct {
+	Bodies       []*blockBody
+	Validations  [][]string           // Validations contained within a block
 }
 
 // blockBodiesData is the network packet for block content distribution.

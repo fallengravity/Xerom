@@ -26,7 +26,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-        "strconv"
+//        "strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -370,10 +370,18 @@ func (bc *BlockChain) CurrentBlock() *types.Block {
 	return bc.currentBlock.Load().(*types.Block)
 }
 
+func (bc *BlockChain) SetCurrentBlock(block *types.Block) {
+	bc.currentBlock.Store(block)
+}
+
 // CurrentFastBlock retrieves the current fast-sync head block of the canonical
 // chain. The block is retrieved from the blockchain's internal cache.
 func (bc *BlockChain) CurrentFastBlock() *types.Block {
 	return bc.currentFastBlock.Load().(*types.Block)
+}
+
+func (bc *BlockChain) SetCurrentFastBlock(block *types.Block) {
+	bc.currentFastBlock.Store(block)
 }
 
 // SetProcessor sets the processor required for making state modifications.
@@ -513,7 +521,7 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) insert(block *types.Block) {
         // Check for next node up for reward
-        if block.Header().Number.Int64() > params.NodeProtocolBlock && !nodeprotocolmessaging.GetSyncStatus() {
+        /*if block.Header().Number.Int64() > params.NodeProtocolBlock && !nodeprotocolmessaging.GetSyncStatus() {
                 rewardBlock := bc.GetBlockByNumber(block.NumberU64() - 100)
                 if rewardBlock != nil {
                         for _, nodeType := range params.NodeTypes {
@@ -523,29 +531,43 @@ func (bc *BlockChain) insert(block *types.Block) {
                                         nodeCount := nodeprotocol.GetNodeCount(state, nodeType.ContractAddress)
                                         if nodeCount > 0 {
                                                 // Determine next reward candidate based on statedb
-                                                nodeId, nodeIp, _ := nodeprotocol.GetNodeCandidate(state, rewardBlock.Hash(), nodeCount, nodeType.ContractAddress)
+                                                nodeId, nodeIp, _, _ := nodeprotocol.GetNodeCandidate(state, rewardBlock.Hash(), nodeCount, nodeType.ContractAddress)
                                                 rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
-
-                                                selfId := nodeprotocol.GetNodeId(nodeprotocol.ActiveNode().Server().Self())
 
                                                 if nodeprotocolmessaging.CheckPeerSet(nodeId, nodeIp) {
                                                         log.Debug("Peer Identified as Reward Candidate - Broadcasting Evidence of Node Activity", "Type", nodeType.Name, "ID", nodeId)
-                                                        var data = []string{nodeType.Name, nodeId, nodeIp, rewardBlock.Hash().String(), rewardBlockNumber}
-                                                        nodeprotocol.UpdateNodeProtocolData(nodeType.Name, nodeId, nodeIp, selfId, nodeprotocolmessaging.GetPeerCount(), rewardBlock.Hash(), rewardBlock.NumberU64(), false)
-                                                        nodeprotocolmessaging.SendNodeProtocolData(data)
+                                                        var data = []string{nodeType.Name, rewardBlockNumber, "true"}
+                                                        nodeprotocol.UpdateNodeProtocolData(nodeType.Name, "true", rewardBlock.NumberU64())
+                                                        nodeprotocolmessaging.SendNodeProtocolValidation(data)
                                                 }
                                                 previousRewardBlock := bc.GetBlockByHash(rewardBlock.ParentHash())
-                                                if previousRewardBlock != nil && !nodeprotocol.CheckUpToDate(nodeType.Name, previousRewardBlock.Hash(), previousRewardBlock.NumberU64()) {
+                                                if previousRewardBlock != nil && !nodeprotocol.CheckUpToDate(nodeType.Name, previousRewardBlock.NumberU64()) {
                                                         log.Debug("Requesting Previous Reward Block Candidate Data", "Type", nodeType.Name)
                                                         previousRewardBlockNumber := strconv.FormatUint(previousRewardBlock.NumberU64(), 10)
-                                                        var data = []string{nodeType.Name, previousRewardBlock.Hash().String(), previousRewardBlockNumber}
-                                                        nodeprotocolmessaging.RequestNodeProtocolData(data)
+							//previousState, stateErr := nodeprotocolmessaging.GetStateAt(previousRewardBlock.Hash())
+							//if stateErr == nil {
+	                                                        //log.Debug("Direct Node Connection Initiated", "Type", nodeType.Name)
+        	                                		//previousNodeCount := nodeprotocol.GetNodeCount(previousState, nodeType.ContractAddress)
+                	                      	 	        //previousNodeId, previousNodeIp, previousNodePort, _ := nodeprotocol.GetNodeCandidate(previousState, previousRewardBlock.Hash(), previousNodeCount, nodeType.ContractAddress)
+								//nodeprotocolmessaging.DirectConnectToNode(previousNodeId, previousNodeIp, previousNodePort)
+							//} else {
+	                                                //        log.Debug("Direct Node Connection Failed - Previous State Unavailable", "Type", nodeType.Name)
+							//}
+                                	                var data = []string{nodeType.Name, previousRewardBlockNumber}
+                                        	        nodeprotocolmessaging.RequestNodeProtocolValidation(data)
+                                                }
+                                                previousParentRewardBlock := bc.GetBlockByHash(previousRewardBlock.ParentHash())
+                                                if previousParentRewardBlock != nil && !nodeprotocol.CheckUpToDate(nodeType.Name, previousParentRewardBlock.NumberU64()) {
+                                                        log.Debug("Requesting Previous Reward Parent Block Candidate Data", "Type", nodeType.Name)
+                                                        previousParentRewardBlockNumber := strconv.FormatUint(previousParentRewardBlock.NumberU64(), 10)
+                                                        var data = []string{nodeType.Name, previousParentRewardBlockNumber}
+                                                        nodeprotocolmessaging.RequestNodeProtocolValidation(data)
                                                 }
                                         }
                                 }
                         }
                 }
-        }
+        }*/
 
 	// If the block is on a side chain or an unknown one, force other heads onto it too
 	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()
@@ -1659,7 +1681,7 @@ func (bc *BlockChain) addBadBlock(block *types.Block) {
 func (bc *BlockChain) rotateBlockData(block *types.Block) bool {
         rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
         nodeprotocol.SetHoldBlockNumber(rewardBlock.Number().Uint64())
-        if nodeprotocol.BadBlockRotation(params.NodeIdArray, params.NodeIpArray, rewardBlock.Hash()) {
+        if nodeprotocol.BadBlockRotation() {
                 return true
         }
         return false
@@ -1667,29 +1689,11 @@ func (bc *BlockChain) rotateBlockData(block *types.Block) bool {
 
 // checkBlockDataRotation validates the node reward solver and broadcasts
 func (bc *BlockChain) checkBlockDataRotation(block *types.Block) {
-        //rewardBlock := bc.GetBlockByNumber(block.Number().Uint64() - 105)
-        //rewardBlockNumber := strconv.FormatUint(rewardBlock.NumberU64(), 10)
-        //var holdBlockCount int64
         if nodeprotocol.HoldBlockCount > 0 && nodeprotocol.HoldBlockNumber != "" {
-               // holdBlockCount = nodeprotocol.HoldBlockCount - 1
                 nodeprotocol.ResetHoldBlockCount()
         } else {
                return
         }
-
-        /*
-        // Determine binary string for node reward block solution
-        binaryString := strconv.FormatInt(holdBlockCount, 2)
-        for len(binaryString) < 4 {
-                binaryString = "0" + binaryString
-        }
-        binaryArray := strings.Split(binaryString, "")
-        for key, nodeType := range params.NodeTypes {
-                if binaryArray[key] == "1" {
-                        var data = []string{nodeType.Name, params.NodeIdArray[key], params.NodeIpArray[key], rewardBlock.Hash().String(), rewardBlockNumber}
-                        nodeprotocolmessaging.SendNodeProtocolData(data)
-                }
-        }*/
 }
 
 // reportBlock logs a bad block error.
